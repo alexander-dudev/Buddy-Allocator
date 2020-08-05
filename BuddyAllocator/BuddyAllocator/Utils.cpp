@@ -4,6 +4,7 @@ class Utils {
 
 private:
 	static const int MIN_BLOCK_SIZE_IN_BYTES = 16;
+
 	int blockSizeRepresentedAsPowerOfTwo;
 	bool* free;
 	bool* split;
@@ -18,6 +19,7 @@ public:
 
 		free = new bool[numberOfPossibleBlocks];
 		split = new bool[numberOfPossibleBlocksWithoutLastLevel];
+		initializeFreeAndSplitArrays();
 	}
 
 	~Utils() {
@@ -25,9 +27,24 @@ public:
 		delete[] split;
 	}
 
+	void initializeFreeAndSplitArrays(int numberOfPossibleBlocks, int numberOfPossibleBlocksWithoutLastLevel) {
+		free[0] = true;
+		for (int i = 1; i < numberOfPossibleBlocks; ++i) {
+			free[i] = false;
+		}
 
+		for (int i = 0; i < numberOfPossibleBlocksWithoutLastLevel; ++i) {
+			split[i] = false;
+		}
+	}
 
-private:
+	bool isFree(int index) {
+		return free[index];
+	}
+
+	bool isSplit(int index) {
+		return split[index];
+	}
 
 	int getNumberOfBlocksPer(int level) {
 		return pow(2, level);
@@ -86,7 +103,10 @@ private:
 	// we need either level or block size as well
 	// we can find it only using a pointer, but will be more difficult - need to know which blocks are split
 	
+	int findNodeIndexFrom(void* pointer) {
 
+		return 0;
+	}
 
 	// knowing the level, we can find the block's size
 	int getLevelBy(int blockIndex) {
@@ -117,6 +137,18 @@ private:
 	// index -> znaem nivo -> znaem razmer na blok
 	// findFirstNodeIndexFor(index) - index -> blokove razstoqnie sprqmo nachaloto
 	// ot tam mojem da namerim adresa na bloka i da go vyrnem
+
+	void* findPointerBy(int nodeIndex) {
+		int nodeLevel = getLevelBy(nodeIndex);
+		int blockSizeForNodeLevel = calculateBlockSizePer(nodeLevel);
+
+		int blockOffsetForNode = nodeIndex - findFirstNodeIndexFor(nodeLevel);
+		// calculate pointer
+		// pointer = pointerToBeginning + pointerblockOffsetForNode * blockSizeForNodeLevel;
+
+		// return pointer 
+		return nullptr;
+	}
 
 	int findFirstNodeIndexFor(int level) {
 		return pow(2, level) - 1;
