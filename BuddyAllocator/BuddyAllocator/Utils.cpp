@@ -5,21 +5,34 @@ class Utils {
 private:
 	static const int MIN_BLOCK_SIZE_IN_BYTES = 16;
 
+	int sizeInBytes;
+	void* pointerToBlockBeginning;
 	int blockSizeRepresentedAsPowerOfTwo;
 	bool* free;
 	bool* split;
 
+	void** arrayContaningListsWithEmptyBlocksForEachLevel;
+
 public:
 
-	Utils(int sizeInBytes) {
+	Utils(int sizeInBytes, void* pointerToBlockBeginning) {
+		this->sizeInBytes = sizeInBytes;
+		this->pointerToBlockBeginning = pointerToBlockBeginning;
 		int numberOfLevels = calculteNumberOfLevels(sizeInBytes);
 		int numberOfPossibleBlocks = calculateNumberOfPossibleBlocks(numberOfLevels);
-		int numberOfPossibleBlocksWithoutLastLevel = calculateNumberOfPossibleBlocks(numberOfLevels - 1);
+		//int numberOfPossibleBlocksWithoutLastLevel = calculateNumberOfPossibleBlocks(numberOfLevels - 1);
 		this->blockSizeRepresentedAsPowerOfTwo = calculatePowerOfTwo(sizeInBytes);
 
 		free = new bool[numberOfPossibleBlocks];
-		split = new bool[numberOfPossibleBlocksWithoutLastLevel];
-		initializeFreeAndSplitArrays();
+		// numberOfPossibleBlocksWithoutLastLevel can be used in the 2 lines below
+		split = new bool[numberOfPossibleBlocks];
+		initializeFreeAndSplitArrays(numberOfPossibleBlocks, numberOfPossibleBlocks);
+
+		arrayContaningListsWithEmptyBlocksForEachLevel = new void*[numberOfLevels];
+		arrayContaningListsWithEmptyBlocksForEachLevel[0] = pointerToBlockBeginning;
+		for (int i = 1; i < numberOfLevels; i++) {
+			arrayContaningListsWithEmptyBlocksForEachLevel[i] = nullptr;
+		}
 	}
 
 	~Utils() {
@@ -27,10 +40,11 @@ public:
 		delete[] split;
 	}
 
+	// big 4 needed
+
 	void initializeFreeAndSplitArrays(int numberOfPossibleBlocks, int numberOfPossibleBlocksWithoutLastLevel) {
-		free[0] = true;
-		for (int i = 1; i < numberOfPossibleBlocks; ++i) {
-			free[i] = false;
+		for (int i = 0; i < numberOfPossibleBlocks; ++i) {
+			free[i] = true;
 		}
 
 		for (int i = 0; i < numberOfPossibleBlocksWithoutLastLevel; ++i) {
@@ -44,6 +58,14 @@ public:
 
 	bool isSplit(int index) {
 		return split[index];
+	}
+
+	void changeFreeState(int index, bool state) {
+		free[index] = state;
+	}
+
+	void changeSplitState(int index, bool state) {
+		split[index] = state;
 	}
 
 	int getNumberOfBlocksPer(int level) {
@@ -98,16 +120,6 @@ public:
 		return nodeIndex % 2 == 0 ? nodeIndex - 1 : nodeIndex + 1;
 	}
 
-	// given pointer -> index
-	// we need to be sure that the pointer points inside the block
-	// we need either level or block size as well
-	// we can find it only using a pointer, but will be more difficult - need to know which blocks are split
-	
-	int findNodeIndexFrom(void* pointer) {
-
-		return 0;
-	}
-
 	// knowing the level, we can find the block's size
 	int getLevelBy(int blockIndex) {
 		double binaryLogarithm = log2(blockIndex);
@@ -130,10 +142,44 @@ public:
 		return pow(2, power) == number;
 	}
 
-	// given index -> pointer; SHOWN BELOW
+
+
+	int findFirstNodeIndexFor(int level) {
+		return pow(2, level) - 1;
+	}
+
+	int findBlockIndexFrom(void* pointer) {
+		return findBlockIndexFrom(pointer, 0, sizeInBytes);
+	}
+
+	// given pointer -> index
+	// we need to be sure that the pointer points inside the block
+	// we need either level or block size as well
+	// we can find it only using a pointer, but will be more difficult - need to know which blocks are split
+	// initial value for blockIndexForCurrentLevel : 0
+	//                   blockSize = whole initial block size
+	int findBlockIndexFrom(void* pointer, int blockIndexForCurrentLevel, int blockSizeForCurrentLevel) {
+		if (pointer == pointerToBlockBeginning && !isSplit(blockIndexForCurrentLevel)) {
+			return blockIndexForCurrentLevel;
+		}
+
+		if (pointer < (char*)pointerToBlockBeginning + (blockSizeForCurrentLevel / 2)) {
+			// moving to the left child
+			return findBlockIndexFrom(pointer, getLeftChildIndex(blockIndexForCurrentLevel), blockSizeForCurrentLevel / 2);
+		}
+		else {
+			// moving to the right child
+			return findBlockIndexFrom(pointer, getRightChildIndex(blockIndexForCurrentLevel), blockSizeForCurrentLevel / 2);
+		}
+
+
+	}
+
+
+	// given a nodeIndex -> return a pointer to the node
 
 	// blokove razstoqnie sprqmo nachaloto
-	// po block index -> razstoqnie
+	// 1) blockIndex -> distance
 	// index -> znaem nivo -> znaem razmer na blok
 	// findFirstNodeIndexFor(index) - index -> blokove razstoqnie sprqmo nachaloto
 	// ot tam mojem da namerim adresa na bloka i da go vyrnem
@@ -141,17 +187,13 @@ public:
 	void* findPointerBy(int nodeIndex) {
 		int nodeLevel = getLevelBy(nodeIndex);
 		int blockSizeForNodeLevel = calculateBlockSizePer(nodeLevel);
+		int numberOfBlocksOffsetForNode = nodeIndex - findFirstNodeIndexFor(nodeLevel);
 
-		int blockOffsetForNode = nodeIndex - findFirstNodeIndexFor(nodeLevel);
-		// calculate pointer
-		// pointer = pointerToBeginning + pointerblockOffsetForNode * blockSizeForNodeLevel;
-
-		// return pointer 
-		return nullptr;
+		return (char*)pointerToBlockBeginning + (numberOfBlocksOffsetForNode * blockSizeForNodeLevel);
 	}
 
-	int findFirstNodeIndexFor(int level) {
-		return pow(2, level) - 1;
+	int findClosestBiggerNumberWhichIsPowerOfTwo(int number) {
+		return numberIsPowerOfTwo(number) ? number : findClosestBiggerNumberWhichIsPowerOfTwo(number + 1);
 	}
 	
 };
