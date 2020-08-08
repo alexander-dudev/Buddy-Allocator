@@ -1,5 +1,5 @@
 #include <cmath>
-
+#include <cstdint>
 class Utils {
 
 private:
@@ -8,10 +8,18 @@ private:
 	int sizeInBytes;
 	void* pointerToBlockBeginning;
 	int blockSizeRepresentedAsPowerOfTwo;
+
 	bool* free;
 	bool* split;
+	int numberOfPossibleBlocks;
+	int numberOfPossibleBlocksWithoutLastLevel;
 
 	void** arrayContaningListsWithEmptyBlocksForEachLevel;
+
+	uint8_t* freeTable;
+	uint8_t* splitTable;
+	int requiredBytesForFreeTable;
+	int requiredBytesForSplitTable;
 
 public:
 
@@ -19,20 +27,30 @@ public:
 		this->sizeInBytes = sizeInBytes;
 		this->pointerToBlockBeginning = pointerToBlockBeginning;
 		int numberOfLevels = calculteNumberOfLevels(sizeInBytes);
-		int numberOfPossibleBlocks = calculateNumberOfPossibleBlocks(numberOfLevels);
+		this->numberOfPossibleBlocks = calculateNumberOfPossibleBlocks(numberOfLevels);
 		//int numberOfPossibleBlocksWithoutLastLevel = calculateNumberOfPossibleBlocks(numberOfLevels - 1);
 		this->blockSizeRepresentedAsPowerOfTwo = calculatePowerOfTwo(sizeInBytes);
 
 		free = new bool[numberOfPossibleBlocks];
-		// numberOfPossibleBlocksWithoutLastLevel can be used in the 2 lines below
+		// numberOfPossibleBlocksWithoutLastLevel can be used in the line below
 		split = new bool[numberOfPossibleBlocks];
-		initializeFreeAndSplitArrays(numberOfPossibleBlocks, numberOfPossibleBlocks);
+		initializeFreeAndSplitArrays();
 
 		arrayContaningListsWithEmptyBlocksForEachLevel = new void*[numberOfLevels];
 		arrayContaningListsWithEmptyBlocksForEachLevel[0] = pointerToBlockBeginning;
 		for (int i = 1; i < numberOfLevels; i++) {
 			arrayContaningListsWithEmptyBlocksForEachLevel[i] = nullptr;
 		}
+
+
+		// free and split bit manipulaion
+		this->requiredBytesForFreeTable = calculateNumberOfRequiredBytesForTables(numberOfPossibleBlocks);
+		// later could be optimized to use less memory
+		// int requiredBytesForSplitTable = calculateNumberOfRequiredBytesForTables(numberOfPossibleBlocksWithoutLastLevel);
+		this->requiredBytesForSplitTable = calculateNumberOfRequiredBytesForTables(numberOfPossibleBlocks);
+
+		freeTable = new uint8_t[requiredBytesForFreeTable];
+		splitTable = new uint8_t[requiredBytesForSplitTable];
 	}
 
 	~Utils() {
@@ -42,30 +60,89 @@ public:
 
 	// big 4 needed
 
-	void initializeFreeAndSplitArrays(int numberOfPossibleBlocks, int numberOfPossibleBlocksWithoutLastLevel) {
+	void initializeFreeAndSplitArrays() {
 		for (int i = 0; i < numberOfPossibleBlocks; ++i) {
 			free[i] = true;
 		}
 
-		for (int i = 0; i < numberOfPossibleBlocksWithoutLastLevel; ++i) {
+		// should be changed to numberOfPossibleBlocksWithoutLastLevel later on
+		for (int i = 0; i < numberOfPossibleBlocks; ++i) {
 			split[i] = false;
 		}
 	}
 
-	bool isFree(int index) {
+	bool isFreeUsingBool(int index) {
 		return free[index];
 	}
 
-	bool isSplit(int index) {
+	bool isSplitUsingBool(int index) {
 		return split[index];
 	}
 
-	void changeFreeState(int index, bool state) {
+	void changeFreeStateUsingBool(int index, bool state) {
 		free[index] = state;
 	}
 
-	void changeSplitState(int index, bool state) {
+	void changeSplitStateUsingBool(int index, bool state) {
 		split[index] = state;
+	}
+
+	void initializeFreeAndSplitTables() {
+		for (int i = 0; i < requiredBytesForFreeTable; ++i) {
+			this->freeTable[i] = 255;
+		}
+
+		for (int i = 0; i < requiredBytesForSplitTable; ++i) {
+			this->splitTable[i] = 0;
+		}
+	}
+
+	bool isFree(int index) {
+		int byteIndex = index / 8;
+		int bitIndexInsideByte = index % 8;
+		uint8_t mask = 1 << bitIndexInsideByte;
+
+		return freeTable[byteIndex] & mask;
+	}
+
+	bool isSplit(int index) {
+		int byteIndex = index / 8;
+		int bitIndexInsideByte = index % 8;
+		uint8_t mask = 1 << bitIndexInsideByte;
+
+		return splitTable[byteIndex] & mask;
+	}
+
+	void markBlockAsFree(int index) {
+		int byteIndex = index / 8;
+		int bitIndexInsideByte = index % 8;
+		uint8_t mask = 1 << bitIndexInsideByte;
+
+		freeTable[byteIndex] |= mask;
+	}
+
+	void markBlockAsBusy(int index) {
+		int byteIndex = index / 8;
+		int bitIndexInsideByte = index % 8;
+		uint8_t mask = 1 << bitIndexInsideByte;
+
+		freeTable[byteIndex] &= ~mask;
+	}
+
+	void markBlockAsSplit(int index) {
+		int byteIndex = index / 8;
+		int bitIndexInsideByte = index % 8;
+		uint8_t mask = 1 << bitIndexInsideByte;
+
+		splitTable[byteIndex] |= mask;
+	}
+
+	void markBlockAsNotSplit(int index) {
+		int byteIndex = index / 8;
+		int bitIndexInsideByte = index % 8;
+		uint8_t mask = 1 << bitIndexInsideByte;
+
+		splitTable[byteIndex] &= ~mask;
 	}
 
 	int getNumberOfBlocksPer(int level) {
@@ -159,7 +236,7 @@ public:
 	// initial value for blockIndexForCurrentLevel : 0
 	//                   blockSize = whole initial block size
 	int findBlockIndexFrom(void* pointer, int blockIndexForCurrentLevel, int blockSizeForCurrentLevel) {
-		if (pointer == pointerToBlockBeginning && !isSplit(blockIndexForCurrentLevel)) {
+		if (pointer == pointerToBlockBeginning && !isSplitUsingBool(blockIndexForCurrentLevel)) {
 			return blockIndexForCurrentLevel;
 		}
 
@@ -194,6 +271,10 @@ public:
 
 	int findClosestBiggerNumberWhichIsPowerOfTwo(int number) {
 		return numberIsPowerOfTwo(number) ? number : findClosestBiggerNumberWhichIsPowerOfTwo(number + 1);
+	}
+
+	int calculateNumberOfRequiredBytesForTables(int numberOfPossibleBlocks) {
+		return numberOfPossibleBlocks % 8 == 0 ? numberOfPossibleBlocks / 8 : numberOfPossibleBlocks / 8 + 1;
 	}
 	
 };

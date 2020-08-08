@@ -20,19 +20,19 @@ public:
 		// as this is a helper recursive function
 
 		// free
-		if (!utils.isSplit(currentBlockIndex) && utils.isFree(currentBlockIndex) && blockSizeInBytes == blockSizeForCurrentLevel) {
-			utils.changeFreeState(currentBlockIndex, false);
+		if (!utils.isSplitUsingBool(currentBlockIndex) && utils.isFreeUsingBool(currentBlockIndex) && blockSizeInBytes == blockSizeForCurrentLevel) {
+			utils.changeFreeStateUsingBool(currentBlockIndex, false);
 			return utils.findPointerBy(currentBlockIndex);
 		}
 
 		// free but with larger size
-		if (!utils.isSplit && utils.isFree(currentBlockIndex) && blockSizeInBytes < blockSizeForCurrentLevel) {
-			utils.changeSplitState(currentBlockIndex, true);
+		if (!utils.isSplitUsingBool && utils.isFreeUsingBool(currentBlockIndex) && blockSizeInBytes < blockSizeForCurrentLevel) {
+			utils.changeSplitStateUsingBool(currentBlockIndex, true);
 			allocateUsingTree(blockSizeInBytes, utils.getLeftChildIndex(currentBlockIndex), blockSizeForCurrentLevel / 2);
 		}
 
 		// busy
-		if (!utils.isSplit && !utils.isFree(currentBlockIndex)) {
+		if (!utils.isSplitUsingBool && !utils.isFreeUsingBool(currentBlockIndex)) {
 			return nullptr;
 		}
 
@@ -45,8 +45,8 @@ public:
 	bool freeUsingTree(void* pointerToBlock) {
 		int blockIndex = utils.findBlockIndexFrom(pointerToBlock);
 
-		if (!utils.isFree(blockIndex)) {
-			utils.changeFreeState(blockIndex, true);
+		if (!utils.isFreeUsingBool(blockIndex)) {
+			utils.changeFreeStateUsingBool(blockIndex, true);
 			mergeBlocks(utils.getParentIndex(blockIndex));
 			return true;
 		} else {
@@ -55,12 +55,12 @@ public:
 	}
 
 	void mergeBlocks(int parentBlock) {
-		if (!utils.isFree(utils.getLeftChildIndex(parentBlock)) || !utils.isFree(utils.getRightChildIndex(parentBlock))) {
+		if (!utils.isFreeUsingBool(utils.getLeftChildIndex(parentBlock)) || !utils.isFreeUsingBool(utils.getRightChildIndex(parentBlock))) {
 			return;
 		}
 
-		utils.changeSplitState(parentBlock, false);
-		utils.changeFreeState(parentBlock, true);
+		utils.changeSplitStateUsingBool(parentBlock, false);
+		utils.changeFreeStateUsingBool(parentBlock, true);
 
 		mergeBlocks(utils.getParentIndex(parentBlock));
 	}
