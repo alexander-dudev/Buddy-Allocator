@@ -1,4 +1,8 @@
+#pragma once
 #include "Utils.cpp"
+#include<iostream>
+using namespace std;
+
 class BuddyAllocator {
 	
 private:
@@ -7,12 +11,15 @@ private:
 	int sizeInBytes;
 	// offset is needed, so that the allocator can know where its metadata begins (for initial blocks
 	// which are not a power of two)
+	int numberOfPossibleBlocks;
 
 public:
 
 	BuddyAllocator(void* pointerToBlockBeginning, int sizeInBytes) : utils(sizeInBytes, pointerToBlockBeginning) {
 		this->pointerToBlockBeginning = pointerToBlockBeginning;
 		this->sizeInBytes = sizeInBytes;
+		int levels = utils.calculteNumberOfLevels(sizeInBytes);
+		this->numberOfPossibleBlocks = utils.calculateNumberOfPossibleBlocks(levels);
 	}
 
 	void* allocateUsingTree(int blockSizeInBytes, int currentBlockIndex, int blockSizeForCurrentLevel) {
@@ -26,13 +33,13 @@ public:
 		}
 
 		// free but with larger size
-		if (!utils.isSplitUsingBool && utils.isFreeUsingBool(currentBlockIndex) && blockSizeInBytes < blockSizeForCurrentLevel) {
+		if (!utils.isSplitUsingBool(currentBlockIndex) && utils.isFreeUsingBool(currentBlockIndex) && blockSizeInBytes < blockSizeForCurrentLevel) {
 			utils.changeSplitStateUsingBool(currentBlockIndex, true);
-			allocateUsingTree(blockSizeInBytes, utils.getLeftChildIndex(currentBlockIndex), blockSizeForCurrentLevel / 2);
+			return allocateUsingTree(blockSizeInBytes, utils.getLeftChildIndex(currentBlockIndex), blockSizeForCurrentLevel / 2);
 		}
 
 		// busy
-		if (!utils.isSplitUsingBool && !utils.isFreeUsingBool(currentBlockIndex)) {
+		if (!utils.isSplitUsingBool(currentBlockIndex) && !utils.isFreeUsingBool(currentBlockIndex)) {
 			return nullptr;
 		}
 
@@ -62,10 +69,24 @@ public:
 		utils.changeSplitStateUsingBool(parentBlock, false);
 		utils.changeFreeStateUsingBool(parentBlock, true);
 
+		if (parentBlock == 0) {
+			return;
+		} else {
 		mergeBlocks(utils.getParentIndex(parentBlock));
+		}
 	}
 
+	void printAllocatorStateUsingBitSet() {
+		for (int i = 0; i < numberOfPossibleBlocks; i++) {
+			cout << "Block with index " << i << " is: " << (utils.isFree(i) ? "free" : "busy") << " and "
+				<< (utils.isSplit(i) ? "split" : "not split") << endl;
+		}
+	}
 
-
-
+	void printAllocatorStateUsingBoolSet() {
+		for (int i = 0; i < numberOfPossibleBlocks; i++) {
+			cout << "Block with index " << i << " is: " << (utils.isFreeUsingBool(i) ? "free" : "busy") << " and "
+				<< (utils.isSplitUsingBool(i) ? "split" : "not split") << endl;
+		}
+	}
 };

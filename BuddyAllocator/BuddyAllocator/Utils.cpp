@@ -1,9 +1,12 @@
+#pragma once
 #include <cmath>
 #include <cstdint>
 class Utils {
 
 private:
+	static const int NUMBER_OF_BITS_IN_A_BYTE = 8;
 	static const int MIN_BLOCK_SIZE_IN_BYTES = 16;
+	const uint8_t maskForBitWithIndexZero = (uint8_t)1;
 
 	int sizeInBytes;
 	void* pointerToBlockBeginning;
@@ -51,6 +54,7 @@ public:
 
 		freeTable = new uint8_t[requiredBytesForFreeTable];
 		splitTable = new uint8_t[requiredBytesForSplitTable];
+		initializeFreeAndSplitTables();
 	}
 
 	~Utils() {
@@ -97,34 +101,39 @@ public:
 		}
 	}
 
-	bool isFree(int index) {
-		int byteIndex = index / 8;
-		int bitIndexInsideByte = index % 8;
-		uint8_t mask = 1 << bitIndexInsideByte;
+	int findByteIndexFor(int blockIndex) {
+		return blockIndex / NUMBER_OF_BITS_IN_A_BYTE;
+	}
+
+	int createMaskFor(int blockIndex) {
+		int bitIndexInsideSingleByte = blockIndex % NUMBER_OF_BITS_IN_A_BYTE;
+		return maskForBitWithIndexZero << bitIndexInsideSingleByte;
+	}
+
+	bool isFree(int blockIndex) {
+		int byteIndex = findByteIndexFor(blockIndex);
+		uint8_t mask = createMaskFor(blockIndex);
 
 		return freeTable[byteIndex] & mask;
 	}
 
-	bool isSplit(int index) {
-		int byteIndex = index / 8;
-		int bitIndexInsideByte = index % 8;
-		uint8_t mask = 1 << bitIndexInsideByte;
+	bool isSplit(int blockIndex) {
+		int byteIndex = findByteIndexFor(blockIndex);
+		uint8_t mask = createMaskFor(blockIndex);
 
 		return splitTable[byteIndex] & mask;
 	}
 
-	void markBlockAsFree(int index) {
-		int byteIndex = index / 8;
-		int bitIndexInsideByte = index % 8;
-		uint8_t mask = 1 << bitIndexInsideByte;
+	void markBlockAsFree(int blockIndex) {
+		int byteIndex = findByteIndexFor(blockIndex);
+		uint8_t mask = createMaskFor(blockIndex);
 
 		freeTable[byteIndex] |= mask;
 	}
 
-	void markBlockAsBusy(int index) {
-		int byteIndex = index / 8;
-		int bitIndexInsideByte = index % 8;
-		uint8_t mask = 1 << bitIndexInsideByte;
+	void markBlockAsBusy(int blockIndex) {
+		int byteIndex = findByteIndexFor(blockIndex);
+		uint8_t mask = createMaskFor(blockIndex);
 
 		freeTable[byteIndex] &= ~mask;
 	}
@@ -166,6 +175,8 @@ public:
 		for (int levelIndex = 0; levelIndex < numberOfLevels; ++levelIndex) {
 			numberOfPossibleBlocks += getNumberOfBlocksPer(levelIndex);
 		}
+
+		return numberOfPossibleBlocks;
 	}
 
 	int calculateBlockSizePer(int level) {
