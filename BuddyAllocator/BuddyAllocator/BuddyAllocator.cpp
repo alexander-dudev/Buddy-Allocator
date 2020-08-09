@@ -105,7 +105,7 @@ private:
 	}
 
 	int findBlockIndexFrom(void* pointer) {
-		return findBlockIndexRecursively(pointer, 0, blockSizeInBytes);
+		return findBlockIndexRecursively(pointer, pointerToBlockBeginning, 0, blockSizeInBytes);
 	}
 
 	// given pointer -> index
@@ -114,23 +114,23 @@ private:
 	// we can find it only using a pointer, but will be more difficult - need to know which blocks are split
 	// initial value for blockIndexForCurrentLevel : 0
 	//                   blockSize = whole initial block size
-	int findBlockIndexRecursively(void* pointer, int blockIndexForCurrentLevel, int blockSizeForCurrentLevel) {
-		if (pointer == pointerToBlockBeginning && !isSplit(blockIndexForCurrentLevel)) {
+	int findBlockIndexRecursively(void* pointerToSearchedBlock, void* pointerToBlockAtCurrentLevel, int blockIndexForCurrentLevel, int blockSizeForCurrentLevel) {
+		if (pointerToSearchedBlock == pointerToBlockAtCurrentLevel && !isSplit(blockIndexForCurrentLevel)) {
 			return blockIndexForCurrentLevel;
 		}
 
-		if (pointer < (char*)pointerToBlockBeginning + (blockSizeForCurrentLevel / 2)) {
+		int blockSizeForLowerLevel = blockSizeForCurrentLevel / 2;
+
+		if (pointerToSearchedBlock < (char*)pointerToBlockAtCurrentLevel + blockSizeForLowerLevel) {
 			// moving to the left child
-			return findBlockIndexRecursively(pointer, Utils::getLeftChildIndex(blockIndexForCurrentLevel), blockSizeForCurrentLevel / 2);
+			return findBlockIndexRecursively(pointerToSearchedBlock, pointerToBlockAtCurrentLevel, Utils::getLeftChildIndex(blockIndexForCurrentLevel), blockSizeForLowerLevel);
 		}
 		else {
 			// moving to the right child
-			return findBlockIndexRecursively(pointer, Utils::getRightChildIndex(blockIndexForCurrentLevel), blockSizeForCurrentLevel / 2);
+			return findBlockIndexRecursively(pointerToSearchedBlock, (char*)pointerToBlockAtCurrentLevel + blockSizeForLowerLevel,
+				                             Utils::getRightChildIndex(blockIndexForCurrentLevel), blockSizeForLowerLevel);
 		}
-
-
 	}
-
 
 	// given a nodeIndex -> return a pointer to the node
 

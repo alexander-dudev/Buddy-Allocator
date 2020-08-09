@@ -30,14 +30,12 @@ void testWorkingWithBuddyAllocator() {
 	allocator.printAllocatorStateUsingBitSet();
 	cout << endl;
 
-	/*
 	void* allocated2 = allocator.allocate(16);
 	allocator.printAllocatorStateUsingBitSet();
 	cout << endl;
-	*/
 
 	allocator.free(allocated);
-	//allocator.free(allocated2);
+	allocator.free(allocated2);
 	allocator.printAllocatorStateUsingBitSet();
 	cout << endl;
 
