@@ -6,22 +6,21 @@
 using namespace std;
 
 const int ALLOCATED_MEMORY_IN_BYTES = 100;
-const int MEMORY_FOR_ALLOCATOR = 64;
+const int BLOCK_SIZE_FOR_ALLOCATOR = 64;
 
 void testBitManipulationLogic();
-void testWorkingWithBuddyAllocator();
+void testAllocatingAndFreeingAllSmallestBlocks();
 
 int main() {
+	testAllocatingAndFreeingAllSmallestBlocks();
 	//testBitManipulationLogic();
-
-	testWorkingWithBuddyAllocator();
 
 	return 0;
 }
 
-void testWorkingWithBuddyAllocator() {
+void testAllocatingAndFreeingAllSmallestBlocks() {
 	void* pointerToSomeMemory = malloc(ALLOCATED_MEMORY_IN_BYTES);
-	BuddyAllocator allocator(pointerToSomeMemory, MEMORY_FOR_ALLOCATOR);
+	BuddyAllocator allocator(pointerToSomeMemory, BLOCK_SIZE_FOR_ALLOCATOR);
 
 	allocator.printAllocatorStateUsingBitSet();
 	cout << endl;
@@ -31,11 +30,15 @@ void testWorkingWithBuddyAllocator() {
 	cout << endl;
 
 	void* allocated2 = allocator.allocate(16);
+	void* allocated3 = allocator.allocate(16);
+	void* allocated4 = allocator.allocate(16);
 	allocator.printAllocatorStateUsingBitSet();
 	cout << endl;
 
 	allocator.free(allocated);
 	allocator.free(allocated2);
+	allocator.free(allocated3);
+	allocator.free(allocated4);
 	allocator.printAllocatorStateUsingBitSet();
 	cout << endl;
 
