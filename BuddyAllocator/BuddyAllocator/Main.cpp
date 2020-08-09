@@ -9,7 +9,6 @@ const int ALLOCATED_MEMORY_IN_BYTES = 100;
 const int MEMORY_FOR_ALLOCATOR = 64;
 
 void testBitManipulationLogic();
-void printAllocatorState(Utils&, int);
 void testWorkingWithBuddyAllocator();
 
 int main() {
@@ -24,15 +23,22 @@ void testWorkingWithBuddyAllocator() {
 	void* pointerToSomeMemory = malloc(ALLOCATED_MEMORY_IN_BYTES);
 	BuddyAllocator allocator(pointerToSomeMemory, MEMORY_FOR_ALLOCATOR);
 
-	allocator.printAllocatorStateUsingBoolSet();
+	allocator.printAllocatorStateUsingBitSet();
 	cout << endl;
 
-	void* allocated = allocator.allocateUsingTree(16, 0, MEMORY_FOR_ALLOCATOR);
-	allocator.printAllocatorStateUsingBoolSet();
+	void* allocated = allocator.allocate(16);
+	allocator.printAllocatorStateUsingBitSet();
 	cout << endl;
 
-	allocator.freeUsingTree(allocated);
-	allocator.printAllocatorStateUsingBoolSet();
+	/*
+	void* allocated2 = allocator.allocate(16);
+	allocator.printAllocatorStateUsingBitSet();
+	cout << endl;
+	*/
+
+	allocator.free(allocated);
+	//allocator.free(allocated2);
+	allocator.printAllocatorStateUsingBitSet();
 	cout << endl;
 
 	free(pointerToSomeMemory);
@@ -43,34 +49,30 @@ void testBitManipulationLogic() {
 	const int MEMORY_FOR_ALLOCATOR = 64;
 
 	void* someMemory = malloc(ALLOCATED_MEMORY_IN_BYTES);
-	Utils utils(MEMORY_FOR_ALLOCATOR, someMemory);
+	BuddyAllocator allocator(someMemory, MEMORY_FOR_ALLOCATOR);
 
-	int levels = utils.calculteNumberOfLevels(MEMORY_FOR_ALLOCATOR);
-	int numberOfPossibleBlocks = utils.calculateNumberOfPossibleBlocks(levels);
+	int levels = Utils::calculteNumberOfLevelsFor(MEMORY_FOR_ALLOCATOR);
+	int numberOfPossibleBlocks = Utils::calculateNumberOfPossibleBlocks(levels);
 
 	cout << "All blocks should be free and not split\n";
-	printAllocatorState(utils, numberOfPossibleBlocks);
+	allocator.printAllocatorStateUsingBitSet();
+	cout << endl;
 
-	utils.markBlockAsSplit(0);
-	utils.markBlockAsSplit(1);
-	utils.markBlockAsBusy(4);
-	utils.markBlockAsBusy(5);
+	allocator.markBlockAsSplit(0);
+	allocator.markBlockAsSplit(1);
+	allocator.markBlockAsBusy(4);
+	allocator.markBlockAsBusy(5);
 
-	printAllocatorState(utils, numberOfPossibleBlocks);
+	allocator.printAllocatorStateUsingBitSet();
+	cout << endl;
 
-	utils.markBlockAsNotSplit(0);
-	utils.markBlockAsNotSplit(1);
-	utils.markBlockAsFree(4);
-	utils.markBlockAsFree(5);
+	allocator.markBlockAsNotSplit(0);
+	allocator.markBlockAsNotSplit(1);
+	allocator.markBlockAsFree(4);
+	allocator.markBlockAsFree(5);
 
-	printAllocatorState(utils, numberOfPossibleBlocks);
+	allocator.printAllocatorStateUsingBitSet();
+	cout << endl;
 
 	free(someMemory);
-}
-
-void printAllocatorState(Utils& utils, int numberOfPossibleBlocks) {
-	for (int i = 0; i < numberOfPossibleBlocks; i++) {
-		cout << "Block with index " << i << " is: " << (utils.isFree(i) ? "free" : "busy") << " and "
-			<< (utils.isSplit(i) ? "split" : "not split") << endl;
-	}
 }
