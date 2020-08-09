@@ -45,7 +45,7 @@ public:
 
 	void* allocate(int sizeInBytes) {
 		int sizeToAllocate = Utils::findClosestBiggerNumberWhichIsPowerOfTwo(sizeInBytes);
-		return allocateRecursively(sizeToAllocate, 0, blockSizeInBytes);
+		return sizeToAllocate <= blockSizeInBytes ? allocateRecursively(sizeToAllocate, 0, blockSizeInBytes) : nullptr;
 	}
 
 	bool free(void* pointerToBlock) {
