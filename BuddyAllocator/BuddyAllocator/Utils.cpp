@@ -8,6 +8,7 @@ public:
 	static const int NUMBER_OF_BITS_IN_A_BYTE = 8;
 	static const int MIN_ALLOCATED_BLOCK_SIZE_IN_BYTES = 16;
 	static const uint8_t MASK_FOR_BIT_WITH_INDEX_ZERO = (uint8_t)1;
+	static const int INVALID_BLOCK_INDEX = -1;
 
 	static int calculateNumberOfBlocksPer(int level) {
 		return pow(2, level);
