@@ -27,14 +27,6 @@ private:
 
 public:
 
-	// test cases:
-	// user gives us size which is a power of two and is 
-	//		1) aligend
-	//		2) not aligned
-	// user gives us size which is not a power of two and is
-	//		1) aligend
-	//		2) not aligned
-
 	BuddyAllocator(void* pointerToBlockBeginning, int blockSizeInBytesFromUser) {
 		this->pointerToUsablePartFromBlock = pointerToBlockBeginning;
 		this->pointerToBlockBeginning = pointerToBlockBeginning;
@@ -72,9 +64,9 @@ public:
 	int initializeFreeAndSplitTables() {
 		int totalBytesUsedForTables = 0;
 
-		while (reinterpret_cast<uintptr_t>(pointerToAlignedMemory) % alignof(int) != 0) {
-			pointerToAlignedMemory = (char*)pointerToAlignedMemory + 1;
-			totalBytesUsedForTables++;
+		if ((uintptr_t)pointerToAlignedMemory % alignof(int) != 0) {
+			totalBytesUsedForTables += alignof(int)-((uintptr_t)pointerToAlignedMemory % alignof(int));
+			pointerToAlignedMemory = (uint8_t*)pointerToAlignedMemory + totalBytesUsedForTables;
 		}
 
 		// aligned is poiting to an aligned address
@@ -82,30 +74,30 @@ public:
 		// free table size
 		int* freeTableSize = (int*) (pointerToAlignedMemory);
 		*freeTableSize = requiredBytesForFreeTable;
-		pointerToAlignedMemory = (char*)pointerToAlignedMemory + sizeof(int);
+		pointerToAlignedMemory = (uint8_t*)pointerToAlignedMemory + sizeof(int);
 		totalBytesUsedForTables += sizeof(int);
 
 		// split table size
 		int* splitTableSize = (int*)(pointerToAlignedMemory);
 		*splitTableSize = requiredBytesForSplitTable;
-		pointerToAlignedMemory = (char*)pointerToAlignedMemory + sizeof(int);
+		pointerToAlignedMemory = (uint8_t*)pointerToAlignedMemory + sizeof(int);
 		totalBytesUsedForTables += sizeof(int);
 
 		// free table
 		freeTable = (uint8_t*) (pointerToAlignedMemory);
-		pointerToAlignedMemory = (char*)pointerToAlignedMemory + *freeTableSize;
+		pointerToAlignedMemory = (uint8_t*)pointerToAlignedMemory + *freeTableSize;
 		totalBytesUsedForTables += *freeTableSize;
 
 		splitTable = (uint8_t*)(pointerToAlignedMemory);
-		pointerToAlignedMemory = (char*)pointerToAlignedMemory + *splitTableSize;
+		pointerToAlignedMemory = (uint8_t*)pointerToAlignedMemory + *splitTableSize;
 		totalBytesUsedForTables += *splitTableSize;
 
 		for (int i = 0; i < requiredBytesForFreeTable; ++i) {
-			this->freeTable[i] = (uint8_t)255;
+			this->freeTable[i] = Utils::LARGEST_8_BIT_NUMBER;
 		}
 
 		for (int i = 0; i < requiredBytesForSplitTable; ++i) {
-			this->splitTable[i] = (uint8_t)0;
+			this->splitTable[i] = Utils::SMALLEST_8_BIT_NUMBER;
 		}
 
 		totalBytesUsedForTables += alignBlockIfNecessary();
