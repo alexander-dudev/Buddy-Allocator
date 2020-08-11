@@ -132,7 +132,7 @@ public:
 		int blockIndex = findBlockIndexFrom(pointerToBlock);
 
 		if (blockIndex == Utils::INVALID_BLOCK_INDEX) {
-			cout << "Warning! This block cannot be freed!" << endl;
+			cerr << "Warning! The block index is invalid!" << endl;
 		}
 
 		for (int i = 0; i < numberOfInaccessibleToUserBlockIndexes; ++i) {
