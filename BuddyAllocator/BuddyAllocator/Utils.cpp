@@ -10,7 +10,7 @@ public:
 	static const uint8_t MASK_FOR_BIT_WITH_INDEX_ZERO = (uint8_t)1;
 	static const int INVALID_BLOCK_INDEX = -1;
 	static const uint8_t LARGEST_8_BIT_NUMBER = 255;
-	static const uint8_t SMALLEST_8_BIT_NUMBER = 1;
+	static const uint8_t SMALLEST_8_BIT_NUMBER = 0;
 
 	static int calculateNumberOfBlocksPer(int level) {
 		return pow(2, level);
