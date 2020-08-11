@@ -14,9 +14,9 @@ class BuddyAllocator {
 //    i.e. blocks for our inner structures that cannot be freed by the user!
 //
 //  4) deal with a not aligned by the user pointer to the block beginnings
-//  5) optimize memory for split table
 
 private:
+	void* pointerToUsablePartFromBlock;
 	void* pointerToBlockBeginning;
 	int blockSizeInBytes;
 
@@ -27,21 +27,42 @@ private:
 	int requiredBytesForFreeTable;
 	int requiredBytesForSplitTable;
 
+	int* forbiddenBlocks;
+	int forbiddenBlocksSize;
+
 public:
 
 	BuddyAllocator(void* pointerToBlockBeginning, int blockSizeInBytes) {
+		this->pointerToUsablePartFromBlock = pointerToBlockBeginning;
 		this->pointerToBlockBeginning = pointerToBlockBeginning;
 		this->blockSizeInBytes = blockSizeInBytes;
 
 		// free and split tables initialization
-		int levels = Utils::calculteNumberOfLevelsFor(blockSizeInBytes);
+		int levels = Utils::calculteNumberOfLevelsFor(this->blockSizeInBytes);
 		this->numberOfPossibleBlocks = Utils::calculateNumberOfPossibleBlocks(levels);
-		this->numberOfPossibleBlocksWithoutLastLevel = Utils::calculateNumberOfPossibleBlocks(levels);
+		this->numberOfPossibleBlocksWithoutLastLevel = Utils::calculateNumberOfPossibleBlocks(levels - 1);
 
 		this->requiredBytesForFreeTable = Utils::calculateNumberOfRequiredBytesFor(numberOfPossibleBlocks);
 		this->requiredBytesForSplitTable = Utils::calculateNumberOfRequiredBytesFor(numberOfPossibleBlocksWithoutLastLevel);
 
 		initializeFreeAndSplitTables();
+
+		if (!Utils::numberIsPowerOfTwo(blockSizeInBytes)) {
+			int closestBiggerBlockSizeWhichIsPowerOfTwo = Utils::findClosestBiggerNumberWhichIsPowerOfTwo(blockSizeInBytes);
+			int missingBytes = closestBiggerBlockSizeWhichIsPowerOfTwo - blockSizeInBytes;
+			this->pointerToBlockBeginning = (char*)pointerToUsablePartFromBlock - missingBytes;
+			this->blockSizeInBytes = closestBiggerBlockSizeWhichIsPowerOfTwo;
+
+			this->forbiddenBlocksSize = Utils::calculateNumberOfRequiredBlocksWithTheMinimumSizeToStore(missingBytes);
+			forbiddenBlocks = new int[forbiddenBlocksSize];
+			for (int i = 0; i < forbiddenBlocksSize; ++i) {
+				void* allocatedBlock = allocate(Utils::MIN_ALLOCATED_BLOCK_SIZE_IN_BYTES);
+				int blockIndex = findBlockIndexFrom(allocatedBlock);
+				forbiddenBlocks[i] = blockIndex;
+			}
+		}
+
+
 	}
 
 	~BuddyAllocator() {
@@ -51,6 +72,8 @@ public:
 
 	// big 4 needed unless free and split tables are moved inside the blocksss
 
+
+
 	void* allocate(int sizeInBytes) {
 		int sizeToAllocate = Utils::findClosestBiggerNumberWhichIsPowerOfTwo(sizeInBytes);
 		return sizeToAllocate <= blockSizeInBytes ? allocateRecursively(sizeToAllocate, 0, blockSizeInBytes) : nullptr;
@@ -58,6 +81,12 @@ public:
 
 	bool free(void* pointerToBlock) {
 		int blockIndex = findBlockIndexFrom(pointerToBlock);
+		for (int i = 0; i < forbiddenBlocksSize; ++i) {
+			if (blockIndex == forbiddenBlocks[i]) {
+				cout << "Warning! This block cannot be freed!";
+				return false;
+			}
+		}
 
 		if (!isSplit(blockIndex) && !isFree(blockIndex)) {
 			markBlockAsFree(blockIndex);

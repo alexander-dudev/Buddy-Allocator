@@ -6,23 +6,24 @@
 using namespace std;
 
 const int ALLOCATED_MEMORY_IN_BYTES = 100;
-const int BLOCK_SIZE_FOR_ALLOCATOR = 64;
+const int BLOCK_SIZE_FOR_ALLOCATOR_POWER_OF_TWO = 64;
+const int BLOCK_SIZE_FOR_ALLOCATOR_NOT_POWER_OF_TWO = 60;
 
 void testBitManipulationLogic();
 void testAllocatingAndFreeingAllSmallestBlocks();
+void testProvidingBlockSizeWhichIsNotPowerOfTwo();
 
 int main() {
 	//testAllocatingAndFreeingAllSmallestBlocks();
-	testBitManipulationLogic();
-
-	cout << sizeof(max_align_t) << endl;
+	//testBitManipulationLogic();
+	testProvidingBlockSizeWhichIsNotPowerOfTwo();
 
 	return 0;
 }
 
 void testAllocatingAndFreeingAllSmallestBlocks() {
 	void* pointerToSomeMemory = malloc(ALLOCATED_MEMORY_IN_BYTES);
-	BuddyAllocator allocator(pointerToSomeMemory, BLOCK_SIZE_FOR_ALLOCATOR);
+	BuddyAllocator allocator(pointerToSomeMemory, BLOCK_SIZE_FOR_ALLOCATOR_POWER_OF_TWO);
 
 	allocator.printAllocatorStateUsingBitSet();
 	cout << endl;
@@ -45,6 +46,13 @@ void testAllocatingAndFreeingAllSmallestBlocks() {
 	cout << endl;
 
 	free(pointerToSomeMemory);
+}
+
+void testProvidingBlockSizeWhichIsNotPowerOfTwo() {
+	void* pointerToSomeMemory = malloc(ALLOCATED_MEMORY_IN_BYTES);
+	BuddyAllocator allocator(pointerToSomeMemory, BLOCK_SIZE_FOR_ALLOCATOR_NOT_POWER_OF_TWO);
+	allocator.printAllocatorStateUsingBitSet();
+	cout << endl;
 }
 
 void testBitManipulationLogic() {

@@ -99,4 +99,14 @@ public:
 	static int calculateNumberOfRequiredBytesFor(int numberOfBits) {
 		return numberOfBits % 8 == 0 ? numberOfBits / 8 : numberOfBits / 8 + 1;
 	}
+
+	static int calculateNumberOfRequiredBlocksWithTheMinimumSizeToStore(int sizeInBytes) {
+		if (sizeInBytes % Utils::MIN_ALLOCATED_BLOCK_SIZE_IN_BYTES == 0) {
+			return sizeInBytes / Utils::MIN_ALLOCATED_BLOCK_SIZE_IN_BYTES;
+		}
+		else {
+			return (sizeInBytes / Utils::MIN_ALLOCATED_BLOCK_SIZE_IN_BYTES) + 1;
+		}
+
+	}
 };
