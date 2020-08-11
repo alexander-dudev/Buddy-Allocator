@@ -83,7 +83,7 @@ public:
 		int blockIndex = findBlockIndexFrom(pointerToBlock);
 		for (int i = 0; i < forbiddenBlocksSize; ++i) {
 			if (blockIndex == forbiddenBlocks[i]) {
-				cout << "Warning! This block cannot be freed!";
+				cout << "Warning! This block cannot be freed!" << endl;
 				return false;
 			}
 		}

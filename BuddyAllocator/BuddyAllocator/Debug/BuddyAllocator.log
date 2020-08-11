@@ -1,4 +1,9 @@
-﻿  Main.cpp
+﻿  Utils.cpp
+d:\sofia university\избираеми дисциплини\семинар по системно програмиране\buddy-allocator\buddyallocator\buddyallocator\utils.cpp(13): warning C4244: 'return': conversion from 'double' to 'int', possible loss of data
+d:\sofia university\избираеми дисциплини\семинар по системно програмиране\buddy-allocator\buddyallocator\buddyallocator\utils.cpp(39): warning C4244: 'return': conversion from 'double' to 'int', possible loss of data
+d:\sofia university\избираеми дисциплини\семинар по системно програмиране\buddy-allocator\buddyallocator\buddyallocator\utils.cpp(84): warning C4244: 'return': conversion from 'double' to 'int', possible loss of data
+d:\sofia university\избираеми дисциплини\семинар по системно програмиране\buddy-allocator\buddyallocator\buddyallocator\utils.cpp(92): warning C4244: 'return': conversion from 'double' to 'int', possible loss of data
+  Main.cpp
 d:\sofia university\избираеми дисциплини\семинар по системно програмиране\buddy-allocator\buddyallocator\buddyallocator\utils.cpp(13): warning C4244: 'return': conversion from 'double' to 'int', possible loss of data
 d:\sofia university\избираеми дисциплини\семинар по системно програмиране\buddy-allocator\buddyallocator\buddyallocator\utils.cpp(39): warning C4244: 'return': conversion from 'double' to 'int', possible loss of data
 d:\sofia university\избираеми дисциплини\семинар по системно програмиране\buddy-allocator\buddyallocator\buddyallocator\utils.cpp(84): warning C4244: 'return': conversion from 'double' to 'int', possible loss of data
