@@ -7,16 +7,19 @@ using namespace std;
 
 const int ALLOCATED_MEMORY_IN_BYTES = 100;
 const int BLOCK_SIZE_FOR_ALLOCATOR_POWER_OF_TWO = 64;
-const int BLOCK_SIZE_FOR_ALLOCATOR_NOT_POWER_OF_TWO = 34;
+const int BLOCK_SIZE_FOR_ALLOCATOR_NOT_POWER_OF_TWO = 55;
 
 void testBitManipulationLogic();
 void testAllocatingAndFreeingAllSmallestBlocks();
 void testProvidingBlockSizeWhichIsNotPowerOfTwo();
 
 int main() {
-	//testAllocatingAndFreeingAllSmallestBlocks();
+	testAllocatingAndFreeingAllSmallestBlocks();
 	//testBitManipulationLogic();
-	testProvidingBlockSizeWhichIsNotPowerOfTwo();
+	//testProvidingBlockSizeWhichIsNotPowerOfTwo();
+
+	cout << alignof(int) << endl;
+	cout << alignof(max_align_t) << endl;
 
 	return 0;
 }
@@ -54,8 +57,8 @@ void testProvidingBlockSizeWhichIsNotPowerOfTwo() {
 	allocator.printAllocatorStateUsingBitSet();
 	cout << endl;
 	
-	allocator.free((char*) pointerToSomeMemory - 30);
-	allocator.free((char*)pointerToSomeMemory - 14);
+	allocator.free((char*) pointerToSomeMemory - 9);
+	allocator.free((char*)pointerToSomeMemory + 7);
 }
 
 void testBitManipulationLogic() {

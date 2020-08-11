@@ -37,6 +37,11 @@ public:
 		this->pointerToBlockBeginning = pointerToBlockBeginning;
 		this->blockSizeInBytes = blockSizeInBytes;
 
+		if (!Utils::numberIsPowerOfTwo(blockSizeInBytes)) {
+			int closestBiggerBlockSizeWhichIsPowerOfTwo = Utils::findClosestBiggerNumberWhichIsPowerOfTwo(blockSizeInBytes);
+			this->blockSizeInBytes = closestBiggerBlockSizeWhichIsPowerOfTwo;
+		}
+
 		// free and split tables initialization
 		int levels = Utils::calculteNumberOfLevelsFor(this->blockSizeInBytes);
 		this->numberOfPossibleBlocks = Utils::calculateNumberOfPossibleBlocks(levels);
@@ -45,7 +50,7 @@ public:
 		this->requiredBytesForFreeTable = Utils::calculateNumberOfRequiredBytesFor(numberOfPossibleBlocks);
 		this->requiredBytesForSplitTable = Utils::calculateNumberOfRequiredBytesFor(numberOfPossibleBlocksWithoutLastLevel);
 
-		initializeFreeAndSplitTables();
+		int usedBytesForStructures = initializeFreeAndSplitTables();
 
 		if (!Utils::numberIsPowerOfTwo(blockSizeInBytes)) {
 			int closestBiggerBlockSizeWhichIsPowerOfTwo = Utils::findClosestBiggerNumberWhichIsPowerOfTwo(blockSizeInBytes);
@@ -53,7 +58,7 @@ public:
 			this->pointerToBlockBeginning = (char*)pointerToUsablePartFromBlock - missingBytes;
 			this->blockSizeInBytes = closestBiggerBlockSizeWhichIsPowerOfTwo;
 
-			this->forbiddenBlocksSize = Utils::calculateNumberOfRequiredBlocksWithTheMinimumSizeToStore(missingBytes);
+			this->forbiddenBlocksSize = Utils::calculateNumberOfRequiredBlocksWithTheMinimumSizeToStore(missingBytes + usedBytesForStructures);
 			forbiddenBlocks = new int[forbiddenBlocksSize];
 			for (int i = 0; i < forbiddenBlocksSize; ++i) {
 				void* allocatedBlock = allocate(Utils::MIN_ALLOCATED_BLOCK_SIZE_IN_BYTES);
@@ -65,9 +70,51 @@ public:
 
 	}
 
-	~BuddyAllocator() {
-		delete[] freeTable;
-		delete[] splitTable;
+	int initializeFreeAndSplitTables() {
+		int totalBytesUsedForStructures = 0;
+
+		void* alignedPointer = pointerToUsablePartFromBlock;
+
+		while (reinterpret_cast<std::uintptr_t>(alignedPointer) % alignof(int) != 0) {
+			alignedPointer = (char*)alignedPointer + 1;
+			totalBytesUsedForStructures++;
+		}
+
+		// aligned is poiting to an aligned address
+
+		// free table size
+		int* freeTableSize = (int*) (alignedPointer);
+		*freeTableSize = requiredBytesForFreeTable;
+		alignedPointer = (char*)alignedPointer + sizeof(int);
+		totalBytesUsedForStructures += sizeof(int);
+
+		// split table size
+		int* splitTableSize = (int*)(alignedPointer);
+		*splitTableSize = requiredBytesForSplitTable;
+		alignedPointer = (char*)alignedPointer + sizeof(int);
+		totalBytesUsedForStructures += sizeof(int);
+
+		// free table
+		freeTable = (uint8_t*) (alignedPointer);
+		alignedPointer = (char*)alignedPointer + *freeTableSize;
+		totalBytesUsedForStructures += *freeTableSize;
+
+		splitTable = (uint8_t*)(alignedPointer);
+		alignedPointer = (char*)alignedPointer + *splitTableSize;
+		totalBytesUsedForStructures += *splitTableSize;
+
+		//freeTable = new uint8_t[requiredBytesForFreeTable];
+		//splitTable = new uint8_t[requiredBytesForFreeTable];
+
+		for (int i = 0; i < requiredBytesForFreeTable; ++i) {
+			this->freeTable[i] = (uint8_t)255;
+		}
+
+		for (int i = 0; i < requiredBytesForSplitTable; ++i) {
+			this->splitTable[i] = (uint8_t)0;
+		}
+
+		return totalBytesUsedForStructures;
 	}
 
 	// big 4 needed unless free and split tables are moved inside the blocksss
@@ -197,18 +244,7 @@ public:
 
 public:
 
-	void initializeFreeAndSplitTables() {
-		freeTable = new uint8_t[requiredBytesForFreeTable];
-		splitTable = new uint8_t[requiredBytesForSplitTable];
 
-		for (int i = 0; i < requiredBytesForFreeTable; ++i) {
-			this->freeTable[i] = (uint8_t)255;
-		}
-
-		for (int i = 0; i < requiredBytesForSplitTable; ++i) {
-			this->splitTable[i] = (uint8_t)0;
-		}
-	}
 
 	int findByteIndexFor(int blockIndex) {
 		return blockIndex / Utils::NUMBER_OF_BITS_IN_A_BYTE;

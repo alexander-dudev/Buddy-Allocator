@@ -8,15 +8,15 @@ d:\sofia university\избираеми дисциплини\семинар по 
 d:\sofia university\избираеми дисциплини\семинар по системно програмиране\buddy-allocator\buddyallocator\buddyallocator\utils.cpp(39): warning C4244: 'return': conversion from 'double' to 'int', possible loss of data
 d:\sofia university\избираеми дисциплини\семинар по системно програмиране\buddy-allocator\buddyallocator\buddyallocator\utils.cpp(84): warning C4244: 'return': conversion from 'double' to 'int', possible loss of data
 d:\sofia university\избираеми дисциплини\семинар по системно програмиране\buddy-allocator\buddyallocator\buddyallocator\utils.cpp(92): warning C4244: 'return': conversion from 'double' to 'int', possible loss of data
-d:\sofia university\избираеми дисциплини\семинар по системно програмиране\buddy-allocator\buddyallocator\buddyallocator\buddyallocator.cpp(231): warning C4800: 'int': forcing value to bool 'true' or 'false' (performance warning)
-d:\sofia university\избираеми дисциплини\семинар по системно програмиране\buddy-allocator\buddyallocator\buddyallocator\buddyallocator.cpp(279): warning C4800: 'int': forcing value to bool 'true' or 'false' (performance warning)
+d:\sofia university\избираеми дисциплини\семинар по системно програмиране\buddy-allocator\buddyallocator\buddyallocator\buddyallocator.cpp(267): warning C4800: 'int': forcing value to bool 'true' or 'false' (performance warning)
+d:\sofia university\избираеми дисциплини\семинар по системно програмиране\buddy-allocator\buddyallocator\buddyallocator\buddyallocator.cpp(315): warning C4800: 'int': forcing value to bool 'true' or 'false' (performance warning)
   BuddyAllocator.cpp
 d:\sofia university\избираеми дисциплини\семинар по системно програмиране\buddy-allocator\buddyallocator\buddyallocator\utils.cpp(13): warning C4244: 'return': conversion from 'double' to 'int', possible loss of data
 d:\sofia university\избираеми дисциплини\семинар по системно програмиране\buddy-allocator\buddyallocator\buddyallocator\utils.cpp(39): warning C4244: 'return': conversion from 'double' to 'int', possible loss of data
 d:\sofia university\избираеми дисциплини\семинар по системно програмиране\buddy-allocator\buddyallocator\buddyallocator\utils.cpp(84): warning C4244: 'return': conversion from 'double' to 'int', possible loss of data
 d:\sofia university\избираеми дисциплини\семинар по системно програмиране\buddy-allocator\buddyallocator\buddyallocator\utils.cpp(92): warning C4244: 'return': conversion from 'double' to 'int', possible loss of data
-d:\sofia university\избираеми дисциплини\семинар по системно програмиране\buddy-allocator\buddyallocator\buddyallocator\buddyallocator.cpp(231): warning C4800: 'int': forcing value to bool 'true' or 'false' (performance warning)
-d:\sofia university\избираеми дисциплини\семинар по системно програмиране\buddy-allocator\buddyallocator\buddyallocator\buddyallocator.cpp(279): warning C4800: 'int': forcing value to bool 'true' or 'false' (performance warning)
+d:\sofia university\избираеми дисциплини\семинар по системно програмиране\buddy-allocator\buddyallocator\buddyallocator\buddyallocator.cpp(267): warning C4800: 'int': forcing value to bool 'true' or 'false' (performance warning)
+d:\sofia university\избираеми дисциплини\семинар по системно програмиране\buddy-allocator\buddyallocator\buddyallocator\buddyallocator.cpp(315): warning C4800: 'int': forcing value to bool 'true' or 'false' (performance warning)
   Generating Code...
   BuddyAllocator.vcxproj -> D:\Sofia University\Избираеми дисциплини\Семинар по системно програмиране\Buddy-Allocator\BuddyAllocator\Debug\BuddyAllocator.exe
   BuddyAllocator.vcxproj -> D:\Sofia University\Избираеми дисциплини\Семинар по системно програмиране\Buddy-Allocator\BuddyAllocator\Debug\BuddyAllocator.pdb (Full PDB)
