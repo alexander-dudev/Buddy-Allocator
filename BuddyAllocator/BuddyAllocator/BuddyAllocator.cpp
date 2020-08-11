@@ -4,19 +4,26 @@
 using namespace std;
 
 class BuddyAllocator {
-	
+
+// TODO:
+// 1) initial block size to be any number
+//    an offset is needed, so that the allocator can know where its metadata begins 
+//    and where its real data begins (for initial blockswhich are not a power of two)
+// 2) free and split tables should be moved inside the block, at the beginning, aligned
+// 3) the information about "forbidden" blocks should be saved;
+//    i.e. blocks for our inner structures that cannot be freed by the user!
+//
+//  4) deal with a not aligned by the user pointer to the block beginnings
+//  5) optimize memory for split table
+
 private:
 	void* pointerToBlockBeginning;
 	int blockSizeInBytes;
 
-	// offset is needed, so that the allocator can know where its metadata begins (for initial blocks
-	// which are not a power of two)
-
-	// the information about "forbidden" blocks should be saved
-	// blocks for our inner structures that cannot be freed by the user!
-
 	uint8_t* freeTable;
 	uint8_t* splitTable;
+	int numberOfPossibleBlocks;
+	int numberOfPossibleBlocksWithoutLastLevel;
 	int requiredBytesForFreeTable;
 	int requiredBytesForSplitTable;
 
@@ -25,14 +32,15 @@ public:
 	BuddyAllocator(void* pointerToBlockBeginning, int blockSizeInBytes) {
 		this->pointerToBlockBeginning = pointerToBlockBeginning;
 		this->blockSizeInBytes = blockSizeInBytes;
-		int levels = Utils::calculteNumberOfLevelsFor(blockSizeInBytes);
-		int numberOfPossibleBlocks = Utils::calculateNumberOfPossibleBlocks(blockSizeInBytes);
 
-		// free and split tables
+		// free and split tables initialization
+		int levels = Utils::calculteNumberOfLevelsFor(blockSizeInBytes);
+		this->numberOfPossibleBlocks = Utils::calculateNumberOfPossibleBlocks(levels);
+		this->numberOfPossibleBlocksWithoutLastLevel = Utils::calculateNumberOfPossibleBlocks(levels);
+
 		this->requiredBytesForFreeTable = Utils::calculateNumberOfRequiredBytesFor(numberOfPossibleBlocks);
-		// later on could be optimized to use less memory:
-		// this->requiredBytesForSplitTable = Utils::calculateNumberOfRequiredBytesFor(numberOfPossibleBlocksWithoutLastLevel);
-		this->requiredBytesForSplitTable = Utils::calculateNumberOfRequiredBytesFor(numberOfPossibleBlocks);
+		this->requiredBytesForSplitTable = Utils::calculateNumberOfRequiredBytesFor(numberOfPossibleBlocksWithoutLastLevel);
+
 		initializeFreeAndSplitTables();
 	}
 
@@ -165,11 +173,11 @@ public:
 		splitTable = new uint8_t[requiredBytesForSplitTable];
 
 		for (int i = 0; i < requiredBytesForFreeTable; ++i) {
-			this->freeTable[i] = 255;
+			this->freeTable[i] = (uint8_t)255;
 		}
 
 		for (int i = 0; i < requiredBytesForSplitTable; ++i) {
-			this->splitTable[i] = 0;
+			this->splitTable[i] = (uint8_t)0;
 		}
 	}
 
@@ -177,51 +185,103 @@ public:
 		return blockIndex / Utils::NUMBER_OF_BITS_IN_A_BYTE;
 	}
 
-	int createMaskFor(int blockIndex) {
-		int bitIndexInsideSingleByte = blockIndex % Utils::NUMBER_OF_BITS_IN_A_BYTE;
-		return Utils::MASK_FOR_BIT_WITH_INDEX_ZERO << bitIndexInsideSingleByte;
+	int findBitIndexInsideSingleByteFor(int blockIndex) {
+		return blockIndex % Utils::NUMBER_OF_BITS_IN_A_BYTE;
 	}
 
 	bool isFree(int blockIndex) {
+		if (blockIndex >= numberOfPossibleBlocks) {
+			cerr << "Warning! An invalid block index is used to check whether a block is free or busy!" << endl;
+			return false;
+		}
+
 		int byteIndex = findByteIndexFor(blockIndex);
-		uint8_t mask = createMaskFor(blockIndex);
+		int bitIndexInsideSingleByte = findBitIndexInsideSingleByteFor(blockIndex);
+		uint8_t mask = createMaskFor(bitIndexInsideSingleByte);
 
 		return freeTable[byteIndex] & mask;
 	}
 
-	bool isSplit(int blockIndex) {
-		int byteIndex = findByteIndexFor(blockIndex);
-		uint8_t mask = createMaskFor(blockIndex);
-
-		return splitTable[byteIndex] & mask;
-	}
-
 	void markBlockAsFree(int blockIndex) {
+		if (blockIndex >= numberOfPossibleBlocks) {
+			cerr << "Warning! An invalid block index is used to mark a block as free!" << endl;
+			return;
+		}
+
 		int byteIndex = findByteIndexFor(blockIndex);
-		uint8_t mask = createMaskFor(blockIndex);
+		int bitIndexInsideSingleByte = findBitIndexInsideSingleByteFor(blockIndex);
+		uint8_t mask = createMaskFor(bitIndexInsideSingleByte);
 
 		freeTable[byteIndex] |= mask;
 	}
 
 	void markBlockAsBusy(int blockIndex) {
+		if (blockIndex >= numberOfPossibleBlocks) {
+			cerr << "Warning! An invalid block index is used to mark a block as busy!" << endl;
+			return;
+		}
+
 		int byteIndex = findByteIndexFor(blockIndex);
-		uint8_t mask = createMaskFor(blockIndex);
+		int bitIndexInsideSingleByte = findBitIndexInsideSingleByteFor(blockIndex);
+		uint8_t mask = createMaskFor(bitIndexInsideSingleByte);
 
 		freeTable[byteIndex] &= ~mask;
 	}
 
-	void markBlockAsSplit(int index) {
-		int byteIndex = index / 8;
-		int bitIndexInsideByte = index % 8;
-		uint8_t mask = 1 << bitIndexInsideByte;
+	int createMaskFor(int bitIndexInsideSingleByte) {
+		return Utils::MASK_FOR_BIT_WITH_INDEX_ZERO << bitIndexInsideSingleByte;
+	}
+
+	bool isSplit(int blockIndex) {
+		if (blockIndex >= numberOfPossibleBlocks) {
+			cerr << "Warning! An invalid block index is used to see whether a block is split or not!" << endl;
+			return false;
+		}
+
+		if (blockIndex >= numberOfPossibleBlocksWithoutLastLevel) {
+			return false;
+		}
+
+		// 0 <= blockIndex < numberOfPossibleBlocksWithoutLastLevel
+		int byteIndex = findByteIndexFor(blockIndex);
+		int bitIndexInsideSingleByte = findBitIndexInsideSingleByteFor(blockIndex);
+		uint8_t mask = createMaskFor(bitIndexInsideSingleByte);
+
+		return splitTable[byteIndex] & mask;
+	}
+
+	void markBlockAsSplit(int blockIndex) {
+		if (blockIndex >= numberOfPossibleBlocks) {
+			cerr << "Warning! An invalid block index is used to mark a block as split!" << endl;
+			return;
+		}
+
+		if (blockIndex >= numberOfPossibleBlocksWithoutLastLevel) {
+			cerr << "Warning! A block from the last level of the allocator tree cannot be marked as split!" << endl;
+			return;
+		}
+
+		int byteIndex = findByteIndexFor(blockIndex);
+		int bitIndexInsideSingleByte = findBitIndexInsideSingleByteFor(blockIndex);
+		uint8_t mask = createMaskFor(bitIndexInsideSingleByte);
 
 		splitTable[byteIndex] |= mask;
 	}
 
-	void markBlockAsNotSplit(int index) {
-		int byteIndex = index / 8;
-		int bitIndexInsideByte = index % 8;
-		uint8_t mask = 1 << bitIndexInsideByte;
+	void markBlockAsNotSplit(int blockIndex) {
+		if (blockIndex >= numberOfPossibleBlocks) {
+			cerr << "Warning! An invalid block index is used to mark a block as not split!" << endl;
+			return;
+		}
+
+		if (blockIndex >= numberOfPossibleBlocksWithoutLastLevel) {
+			cerr << "Warning! A block from the last level of the allocator tree cannot be marked as not split!" << endl;
+			return;
+		}
+
+		int byteIndex = findByteIndexFor(blockIndex);
+		int bitIndexInsideSingleByte = findBitIndexInsideSingleByteFor(blockIndex);
+		uint8_t mask = createMaskFor(bitIndexInsideSingleByte);
 
 		splitTable[byteIndex] &= ~mask;
 	}

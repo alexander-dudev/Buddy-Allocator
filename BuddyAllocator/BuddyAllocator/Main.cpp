@@ -12,8 +12,10 @@ void testBitManipulationLogic();
 void testAllocatingAndFreeingAllSmallestBlocks();
 
 int main() {
-	testAllocatingAndFreeingAllSmallestBlocks();
-	//testBitManipulationLogic();
+	//testAllocatingAndFreeingAllSmallestBlocks();
+	testBitManipulationLogic();
+
+	cout << sizeof(max_align_t) << endl;
 
 	return 0;
 }
