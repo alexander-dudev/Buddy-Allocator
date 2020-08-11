@@ -1,5 +1,5 @@
 BuddyAllocator.VC.VC.opendb
 BuddyAllocator/.vs/BuddyAllocator/v14/.suo
 BuddyAllocator/BuddyAllocator.VC.db
-BuddyAllocator/Debug/*
-BuddyAllocator/BuddyAllocator/Debug/*
+BuddyAllocator/Debug/
+BuddyAllocator/BuddyAllocator/Debug/
