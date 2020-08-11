@@ -41,6 +41,16 @@ void testAllocatingAndFreeingAllSmallestBlocks() {
 	allocator.printAllocatorStateUsingBitSet();
 	cout << endl;
 
+	int* randomInt = (int*)allocated2;
+	*randomInt = 8;
+	cout << *randomInt << endl;
+	cout << (uintptr_t)allocated2 % alignof(max_align_t) << endl;
+
+	double* randomDouble = (double*)allocated3;
+	*randomDouble = 8.5;
+	cout << *randomDouble << endl;
+	cout << (uintptr_t)allocated3 % alignof(max_align_t) << endl;
+
 	allocator.free(allocated);
 	allocator.free(allocated2);
 	allocator.free(allocated3);
