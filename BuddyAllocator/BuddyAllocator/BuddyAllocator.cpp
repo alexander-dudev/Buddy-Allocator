@@ -6,21 +6,20 @@ using namespace std;
 class BuddyAllocator {
 
 	// TODO:
-	// 1) deal with a not aligned by the user pointer to the block beginnings
-	// 2) move all variables inside the block, incl. the forbidden blocks
+	// 1) move all variables inside the block, incl. the forbidden blocks
 
 private:
-	void* pointerToUsablePartFromBlock;
 	void* pointerToBlockBeginning;
 	void* pointerToAlignedMemory;
 	int blockSizeInBytes;
 
 	uint8_t* freeTable;
+	int* numberOfPossibleBlocks;
+	int* requiredBytesForFreeTable;
+
 	uint8_t* splitTable;
-	int numberOfPossibleBlocks;
-	int numberOfPossibleBlocksWithoutLastLevel;
-	int requiredBytesForFreeTable;
-	int requiredBytesForSplitTable;
+	int* numberOfPossibleBlocksWithoutLastLevel;
+	int* requiredBytesForSplitTable;
 
 	int* inaccessibleToUserBlockIndexes;
 	int numberOfInaccessibleToUserBlockIndexes;
@@ -28,7 +27,6 @@ private:
 public:
 
 	BuddyAllocator(void* pointerToBlockBeginning, int blockSizeInBytesFromUser) {
-		this->pointerToUsablePartFromBlock = pointerToBlockBeginning;
 		this->pointerToBlockBeginning = pointerToBlockBeginning;
 		this->pointerToAlignedMemory = pointerToBlockBeginning;
 		this->blockSizeInBytes = blockSizeInBytesFromUser;
@@ -39,19 +37,12 @@ public:
 		}
 
 		// free and split tables initialization
-		int levels = Utils::calculteNumberOfLevelsFor(this->blockSizeInBytes);
-		this->numberOfPossibleBlocks = Utils::calculateNumberOfPossibleBlocks(levels);
-		this->numberOfPossibleBlocksWithoutLastLevel = Utils::calculateNumberOfPossibleBlocks(levels - 1);
-
-		this->requiredBytesForFreeTable = Utils::calculateNumberOfRequiredBytesFor(numberOfPossibleBlocks);
-		this->requiredBytesForSplitTable = Utils::calculateNumberOfRequiredBytesFor(numberOfPossibleBlocksWithoutLastLevel);
-
-		int numberOfUsedBytesByTables = initializeFreeAndSplitTables();
+		int numberOfBytesUsedByTables = initializeFreeAndSplitTables();
 
 		int missingBytes = this->blockSizeInBytes - blockSizeInBytesFromUser;
-		this->pointerToBlockBeginning = (char*)pointerToUsablePartFromBlock - missingBytes;
+		this->pointerToBlockBeginning = (uint8_t*)pointerToBlockBeginning - missingBytes;
 
-		this->numberOfInaccessibleToUserBlockIndexes = Utils::calculateNumberOfRequiredBlocksWithTheMinimumSizeToStore(missingBytes + numberOfUsedBytesByTables);
+		this->numberOfInaccessibleToUserBlockIndexes = Utils::calculateNumberOfRequiredBlocksWithTheMinimumSizeToStore(missingBytes + numberOfBytesUsedByTables);
 		inaccessibleToUserBlockIndexes = new int[numberOfInaccessibleToUserBlockIndexes];
 		for (int i = 0; i < numberOfInaccessibleToUserBlockIndexes; ++i) {
 			void* allocatedBlock = allocate(Utils::MIN_ALLOCATED_BLOCK_SIZE_IN_BYTES);
@@ -62,6 +53,22 @@ public:
 	}
 
 	int initializeFreeAndSplitTables() {
+
+		// in the provided by the user memory the data the allocator needs is ordered as follows:
+		// bytes for alignment (for next int) | numberOfPossibleBlocks (int) | requiredBytesForFreeTable (int)
+		// numberOfPossibleBlockWithoutLastLevel (int) | requiredBytesForSplitTable (int) 
+		// bytes for free table bit field | bytes for split table bit field
+		// bytes for alignment (for next int)
+		// numberOfInaccessibleToUserBlockIndexes (int) | inaccessibleToUserBlockIndexes (int[])
+		// bytes for alignment (for blocks which will be returned to the user)
+
+		int levels = Utils::calculteNumberOfLevelsFor(this->blockSizeInBytes);
+		int numberOfPossibleBlocks = Utils::calculateNumberOfPossibleBlocks(levels);
+		int numberOfPossibleBlocksWithoutLastLevel = Utils::calculateNumberOfPossibleBlocks(levels - 1);
+
+		int requiredBytesForFreeTable = Utils::calculateNumberOfRequiredBytesFor(numberOfPossibleBlocks);
+		int requiredBytesForSplitTable = Utils::calculateNumberOfRequiredBytesFor(numberOfPossibleBlocksWithoutLastLevel);
+
 		int totalBytesUsedForTables = 0;
 
 		if ((uintptr_t)pointerToAlignedMemory % alignof(int) != 0) {
@@ -69,28 +76,41 @@ public:
 			pointerToAlignedMemory = (uint8_t*)pointerToAlignedMemory + totalBytesUsedForTables;
 		}
 
-		// aligned is poiting to an aligned address
+		// pointerToAlignedMemory is pointing to an aligned address for an int variable
+
+		// number of possible blocks
+		this->numberOfPossibleBlocks = (int*)pointerToAlignedMemory;
+		*(this->numberOfPossibleBlocks) = numberOfPossibleBlocks;
+		pointerToAlignedMemory = (uint8_t*)pointerToAlignedMemory + sizeof(int);
+		totalBytesUsedForTables += sizeof(int);
 
 		// free table size
-		int* freeTableSize = (int*) (pointerToAlignedMemory);
-		*freeTableSize = requiredBytesForFreeTable;
+		this->requiredBytesForFreeTable = (int*)pointerToAlignedMemory;
+		*(this->requiredBytesForFreeTable) = requiredBytesForFreeTable;
+		pointerToAlignedMemory = (uint8_t*)pointerToAlignedMemory + sizeof(int);
+		totalBytesUsedForTables += sizeof(int);
+
+		// number of possible blocks without last level
+		this->numberOfPossibleBlocksWithoutLastLevel = (int*)pointerToAlignedMemory;
+		*(this->numberOfPossibleBlocksWithoutLastLevel) = numberOfPossibleBlocksWithoutLastLevel;
 		pointerToAlignedMemory = (uint8_t*)pointerToAlignedMemory + sizeof(int);
 		totalBytesUsedForTables += sizeof(int);
 
 		// split table size
-		int* splitTableSize = (int*)(pointerToAlignedMemory);
-		*splitTableSize = requiredBytesForSplitTable;
+		this->requiredBytesForSplitTable = (int*)(pointerToAlignedMemory);
+		*(this->requiredBytesForSplitTable) = requiredBytesForSplitTable;
 		pointerToAlignedMemory = (uint8_t*)pointerToAlignedMemory + sizeof(int);
 		totalBytesUsedForTables += sizeof(int);
 
 		// free table
-		freeTable = (uint8_t*) (pointerToAlignedMemory);
-		pointerToAlignedMemory = (uint8_t*)pointerToAlignedMemory + *freeTableSize;
-		totalBytesUsedForTables += *freeTableSize;
+		freeTable = (uint8_t*)pointerToAlignedMemory;
+		pointerToAlignedMemory = (uint8_t*)pointerToAlignedMemory + *(this->requiredBytesForFreeTable);
+		totalBytesUsedForTables += *(this->requiredBytesForFreeTable);
 
-		splitTable = (uint8_t*)(pointerToAlignedMemory);
-		pointerToAlignedMemory = (uint8_t*)pointerToAlignedMemory + *splitTableSize;
-		totalBytesUsedForTables += *splitTableSize;
+		// split table
+		splitTable = (uint8_t*)pointerToAlignedMemory;
+		pointerToAlignedMemory = (uint8_t*)pointerToAlignedMemory + *(this->requiredBytesForSplitTable);
+		totalBytesUsedForTables += *(this->requiredBytesForSplitTable);
 
 		for (int i = 0; i < requiredBytesForFreeTable; ++i) {
 			this->freeTable[i] = Utils::LARGEST_8_BIT_NUMBER;
@@ -255,7 +275,7 @@ public:
 	}
 
 	bool isFree(int blockIndex) {
-		if (blockIndex >= numberOfPossibleBlocks) {
+		if (blockIndex >= *numberOfPossibleBlocks) {
 			cerr << "Warning! An invalid block index is used to check whether a block is free or busy!" << endl;
 			return false;
 		}
@@ -268,7 +288,7 @@ public:
 	}
 
 	void markBlockAsFree(int blockIndex) {
-		if (blockIndex >= numberOfPossibleBlocks) {
+		if (blockIndex >= *numberOfPossibleBlocks) {
 			cerr << "Warning! An invalid block index is used to mark a block as free!" << endl;
 			return;
 		}
@@ -281,7 +301,7 @@ public:
 	}
 
 	void markBlockAsBusy(int blockIndex) {
-		if (blockIndex >= numberOfPossibleBlocks) {
+		if (blockIndex >= *numberOfPossibleBlocks) {
 			cerr << "Warning! An invalid block index is used to mark a block as busy!" << endl;
 			return;
 		}
@@ -298,12 +318,12 @@ public:
 	}
 
 	bool isSplit(int blockIndex) {
-		if (blockIndex >= numberOfPossibleBlocks) {
+		if (blockIndex >= *numberOfPossibleBlocks) {
 			cerr << "Warning! An invalid block index is used to see whether a block is split or not!" << endl;
 			return false;
 		}
 
-		if (blockIndex >= numberOfPossibleBlocksWithoutLastLevel) {
+		if (blockIndex >= *numberOfPossibleBlocksWithoutLastLevel) {
 			return false;
 		}
 
@@ -316,12 +336,12 @@ public:
 	}
 
 	void markBlockAsSplit(int blockIndex) {
-		if (blockIndex >= numberOfPossibleBlocks) {
+		if (blockIndex >= *numberOfPossibleBlocks) {
 			cerr << "Warning! An invalid block index is used to mark a block as split!" << endl;
 			return;
 		}
 
-		if (blockIndex >= numberOfPossibleBlocksWithoutLastLevel) {
+		if (blockIndex >= *numberOfPossibleBlocksWithoutLastLevel) {
 			cerr << "Warning! A block from the last level of the allocator tree cannot be marked as split!" << endl;
 			return;
 		}
@@ -334,12 +354,12 @@ public:
 	}
 
 	void markBlockAsNotSplit(int blockIndex) {
-		if (blockIndex >= numberOfPossibleBlocks) {
+		if (blockIndex >= *numberOfPossibleBlocks) {
 			cerr << "Warning! An invalid block index is used to mark a block as not split!" << endl;
 			return;
 		}
 
-		if (blockIndex >= numberOfPossibleBlocksWithoutLastLevel) {
+		if (blockIndex >= *numberOfPossibleBlocksWithoutLastLevel) {
 			cerr << "Warning! A block from the last level of the allocator tree cannot be marked as not split!" << endl;
 			return;
 		}
