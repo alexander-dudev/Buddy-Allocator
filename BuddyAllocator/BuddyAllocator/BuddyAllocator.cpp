@@ -22,7 +22,7 @@ private:
 	int* requiredBytesForSplitTable;
 
 	int* inaccessibleToUserBlockIndexes;
-	int numberOfInaccessibleToUserBlockIndexes;
+	int* numberOfInaccessibleToUserBlockIndexes;
 
 public:
 
@@ -36,15 +36,57 @@ public:
 			this->blockSizeInBytes = closestBiggerBlockSizeWhichIsPowerOfTwo;
 		}
 
-		// free and split tables initialization
-		int numberOfBytesUsedByTables = initializeFreeAndSplitTables();
-
 		int missingBytes = this->blockSizeInBytes - blockSizeInBytesFromUser;
 		this->pointerToBlockBeginning = (uint8_t*)pointerToBlockBeginning - missingBytes;
 
-		this->numberOfInaccessibleToUserBlockIndexes = Utils::calculateNumberOfRequiredBlocksWithTheMinimumSizeToStore(missingBytes + numberOfBytesUsedByTables);
-		inaccessibleToUserBlockIndexes = new int[numberOfInaccessibleToUserBlockIndexes];
-		for (int i = 0; i < numberOfInaccessibleToUserBlockIndexes; ++i) {
+		int bytesInitialAlignement = 0;
+		if ((uintptr_t)this->pointerToBlockBeginning % alignof(max_align_t) != 0) {
+			bytesInitialAlignement = ((uintptr_t)this->pointerToBlockBeginning % alignof(max_align_t));
+			this->pointerToBlockBeginning = (uint8_t*)this->pointerToBlockBeginning - bytesInitialAlignement;
+		}
+
+		// free and split tables initialization
+		int numberOfBytesUsedByTables = initializeFreeAndSplitTables();
+		// at least 2 more integers are required to store the informatio about inaccessible to users blocks
+		// and after that the block has to be aligned for the users
+		numberOfBytesUsedByTables += bytesInitialAlignement;
+		int numberOfBlocksToStoreInnerDataSoFar = Utils::calculateNumberOfRequiredBlocksWithTheMinimumSizeToStore(numberOfBytesUsedByTables + missingBytes);
+
+		// align to store ints !!!
+		void* temporaryPointer = this->pointerToAlignedMemory;
+		int bytesAfterAddingInaccessibleBlocksData = numberOfBytesUsedByTables;
+		bytesAfterAddingInaccessibleBlocksData += missingBytes;
+		if ((uintptr_t)temporaryPointer % alignof(int) != 0) {
+			int bytesForAlignment = alignof(int)-((uintptr_t)temporaryPointer % alignof(int));
+			temporaryPointer = (uint8_t*)temporaryPointer + bytesForAlignment;
+			bytesAfterAddingInaccessibleBlocksData += bytesForAlignment;
+		}
+
+		void* temp2 = temporaryPointer;
+
+		bytesAfterAddingInaccessibleBlocksData += sizeof(int) + sizeof(int) * numberOfBlocksToStoreInnerDataSoFar;
+
+		
+		temporaryPointer = (uint8_t*)temporaryPointer + sizeof(int) + sizeof(int) * numberOfBlocksToStoreInnerDataSoFar;
+
+		int numberOfBlocksAfterAddingInaccessibleBlocksInfo = Utils::calculateNumberOfRequiredBlocksWithTheMinimumSizeToStore(bytesAfterAddingInaccessibleBlocksData);
+
+		while (numberOfBlocksAfterAddingInaccessibleBlocksInfo - numberOfBlocksToStoreInnerDataSoFar > 0) {
+			// remove bytes for alignment
+
+			bytesAfterAddingInaccessibleBlocksData += (numberOfBlocksAfterAddingInaccessibleBlocksInfo - numberOfBlocksToStoreInnerDataSoFar) * sizeof(int);
+
+			numberOfBlocksToStoreInnerDataSoFar = numberOfBlocksAfterAddingInaccessibleBlocksInfo;
+			numberOfBlocksAfterAddingInaccessibleBlocksInfo = Utils::calculateNumberOfRequiredBlocksWithTheMinimumSizeToStore(bytesAfterAddingInaccessibleBlocksData);
+		}
+
+
+
+
+		this->numberOfInaccessibleToUserBlockIndexes = (int*)temp2;
+		*(this->numberOfInaccessibleToUserBlockIndexes) = Utils::calculateNumberOfRequiredBlocksWithTheMinimumSizeToStore(bytesAfterAddingInaccessibleBlocksData);
+		inaccessibleToUserBlockIndexes = this->numberOfInaccessibleToUserBlockIndexes + sizeof(int);
+		for (int i = 0; i < *(this->numberOfInaccessibleToUserBlockIndexes); ++i) {
 			void* allocatedBlock = allocate(Utils::MIN_ALLOCATED_BLOCK_SIZE_IN_BYTES);
 			int blockIndex = findBlockIndexFrom(allocatedBlock);
 			inaccessibleToUserBlockIndexes[i] = blockIndex;
@@ -56,9 +98,9 @@ public:
 
 		// in the provided by the user memory the data the allocator needs is ordered as follows:
 		// bytes for alignment (for next int) | numberOfPossibleBlocks (int) | requiredBytesForFreeTable (int)
-		// numberOfPossibleBlockWithoutLastLevel (int) | requiredBytesForSplitTable (int) 
-		// bytes for free table bit field | bytes for split table bit field
-		// bytes for alignment (for next int)
+		// numberOfPossibleBlockWithoutLastLevel (int) | requiredBytesForSplitTable (int) (16B)
+		// bytes for free table bit field | bytes for split table bit field (18)
+		// bytes for alignment (for next int) (20)
 		// numberOfInaccessibleToUserBlockIndexes (int) | inaccessibleToUserBlockIndexes (int[])
 		// bytes for alignment (for blocks which will be returned to the user)
 
@@ -120,19 +162,22 @@ public:
 			this->splitTable[i] = Utils::SMALLEST_8_BIT_NUMBER;
 		}
 
-		totalBytesUsedForTables += alignBlockIfNecessary();
 		return totalBytesUsedForTables;
 	}
 
-	int alignBlockIfNecessary() {
+	int alignBlockIfNecessary(void*& pointerToBlock) {
 		int numberOfSkippedBytesForAlignment = 0;
 
-		if ((uintptr_t)pointerToAlignedMemory % alignof(max_align_t) != 0) {
-			numberOfSkippedBytesForAlignment = alignof(max_align_t)-((uintptr_t)pointerToAlignedMemory % alignof(max_align_t));
-			pointerToAlignedMemory = (uint8_t*)pointerToAlignedMemory + numberOfSkippedBytesForAlignment;
+		if ((uintptr_t)pointerToBlock % Utils::MIN_ALLOCATED_BLOCK_SIZE_IN_BYTES != 0) {
+			numberOfSkippedBytesForAlignment = Utils::MIN_ALLOCATED_BLOCK_SIZE_IN_BYTES -((uintptr_t)pointerToBlock % Utils::MIN_ALLOCATED_BLOCK_SIZE_IN_BYTES);
+			pointerToBlock = (uint8_t*)pointerToBlock + numberOfSkippedBytesForAlignment;
 		}
 
 		return numberOfSkippedBytesForAlignment;
+	}
+
+	int calculateNumberOfBytesNeededForAlignment(void* pointerToBlock) {
+		return alignof(max_align_t)-((uintptr_t)pointerToBlock % alignof(max_align_t));
 	}
 
 	void* allocate(int sizeInBytes) {
@@ -147,7 +192,7 @@ public:
 			cerr << "Warning! The block index is invalid!" << endl;
 		}
 
-		for (int i = 0; i < numberOfInaccessibleToUserBlockIndexes; ++i) {
+		for (int i = 0; i < *(this->numberOfInaccessibleToUserBlockIndexes); ++i) {
 			if (blockIndex == inaccessibleToUserBlockIndexes[i]) {
 				cout << "Warning! This block cannot be freed!" << endl;
 				return false;
@@ -193,7 +238,8 @@ private:
 	}
 
 	void mergeFreeBlocks(int parentBlockIndex) {
-		if (!isFree(Utils::getLeftChildIndex(parentBlockIndex)) || !isFree(Utils::getRightChildIndex(parentBlockIndex))) {
+		if (isSplit(Utils::getLeftChildIndex(parentBlockIndex)) || !isFree(Utils::getLeftChildIndex(parentBlockIndex)) 
+		    || isSplit(Utils::getRightChildIndex(parentBlockIndex)) || !isFree(Utils::getRightChildIndex(parentBlockIndex))) {
 			return;
 		}
 

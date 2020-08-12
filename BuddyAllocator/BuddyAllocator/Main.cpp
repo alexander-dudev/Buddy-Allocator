@@ -6,7 +6,7 @@
 using namespace std;
 
 const int ALLOCATED_MEMORY_IN_BYTES = 100;
-const int BLOCK_SIZE_FOR_ALLOCATOR_POWER_OF_TWO = 64;
+const int BLOCK_SIZE_FOR_ALLOCATOR_POWER_OF_TWO = 256;
 const int BLOCK_SIZE_FOR_ALLOCATOR_NOT_POWER_OF_TWO = 55;
 
 void testBitManipulationLogic();
@@ -26,7 +26,7 @@ int main() {
 
 void testAllocatingAndFreeingAllSmallestBlocks() {
 	void* pointerToSomeMemory = malloc(ALLOCATED_MEMORY_IN_BYTES);
-	BuddyAllocator allocator(pointerToSomeMemory, BLOCK_SIZE_FOR_ALLOCATOR_POWER_OF_TWO);
+	BuddyAllocator allocator((void*)((uint8_t*)pointerToSomeMemory+2), BLOCK_SIZE_FOR_ALLOCATOR_POWER_OF_TWO);
 
 	allocator.printAllocatorStateUsingBitSet();
 	cout << endl;
@@ -46,10 +46,16 @@ void testAllocatingAndFreeingAllSmallestBlocks() {
 	cout << *randomInt << endl;
 	cout << (uintptr_t)allocated2 % alignof(max_align_t) << endl;
 
+	double* randomDouble = (double*)allocated3;
+	*randomDouble = 8.5;
+	cout << *randomDouble << endl;
+	cout << (uintptr_t)allocated3 % alignof(max_align_t) << endl;
+
 	allocator.free(allocated);
 	allocator.free(allocated2);
 	allocator.free(allocated3);
 	allocator.free(allocated4);
+
 	allocator.printAllocatorStateUsingBitSet();
 	cout << endl;
 
