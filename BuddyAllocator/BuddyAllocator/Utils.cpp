@@ -9,14 +9,16 @@ public:
 	static const int MIN_ALLOCATED_BLOCK_SIZE_IN_BYTES = 16;
 	static const uint8_t MASK_FOR_BIT_WITH_INDEX_ZERO = (uint8_t)1;
 	static const int INVALID_BLOCK_INDEX = -1;
-	static const uint8_t LARGEST_8_BIT_NUMBER = 255;
-	static const uint8_t SMALLEST_8_BIT_NUMBER = 0;
+	static const uint8_t LARGEST_8_BIT_NUMBER = (uint8_t)255;
+	static const uint8_t SMALLEST_8_BIT_NUMBER = (uint8_t)0;
 
+	// pow(2,i) == 1 << i
 	static int calculateNumberOfBlocksPer(int level) {
-		return pow(2, level);
+		//return pow(2, level);
+		return 1 << level;
 	}
 
-	static int calculteNumberOfLevelsFor(int blockSizeInBytes) {
+	static int calculateNumberOfLevelsFor(int blockSizeInBytes) {
 		int numberOfLevels = 1;
 		while (blockSizeInBytes > MIN_ALLOCATED_BLOCK_SIZE_IN_BYTES) {
 			blockSizeInBytes /= 2;
@@ -25,6 +27,7 @@ public:
 		
 		return numberOfLevels;
 
+		// or
 		//return calculatePowerOfTwo(blockSizeInBytes) - calculatePowerOfTwo(MIN_ALLOCATED_BLOCK_SIZE_IN_BYTES) + 1;
 	}
 
@@ -37,9 +40,10 @@ public:
 		return numberOfPossibleBlocks;
 	}
 
-	static int calculateBlockSizePer(int level, int initialBlockSizeInBytes) {
+	static int calculateBlockSizePer(int levelIndex, int initialBlockSizeInBytes) {
 		int sizeRepresentedAsPowerOfTwo = calculatePowerOfTwo(initialBlockSizeInBytes);
-		return pow(2, sizeRepresentedAsPowerOfTwo - level);
+		//return pow(2, sizeRepresentedAsPowerOfTwo - levelIndex);
+		return 1 << (sizeRepresentedAsPowerOfTwo - levelIndex);
 	}
 
 	static int calculatePowerOfTwo(int number) {
@@ -48,7 +52,8 @@ public:
 		}
 
 		int powerOfTwo = 0;
-		while (pow(2, powerOfTwo) < number) {
+		//while (pow(2, powerOfTwo) < number) {
+		while ((1 << powerOfTwo) < number) {
 			powerOfTwo++;
 		}
 
@@ -58,11 +63,13 @@ public:
 	static bool numberIsPowerOfTwo(int number) {
 		int power = 0;
 
-		while (pow(2, power) < number) {
+		//while (pow(2, power) < number) {
+		while ((1 << power) < number) {
 			power++;
 		}
 
-		return pow(2, power) == number;
+		//return pow(2, power) == number;
+		return (1 << power) == number;
 	}
 
 	static int getLeftChildIndex(int parentIndex) {
@@ -87,12 +94,12 @@ public:
 		return numberIsPowerOfTwo(blockIndex + 1) ? ceil(binaryLogarithm) : floor(binaryLogarithm);
 	}
 
-	// given a level -> list of block indexes for that level
 	// the first block index for a level "i" is: (2^i) - 1
 	// on each level there are exactly 2^i blocks
 
 	static int findFirstNodeIndexFor(int level) {
-		return pow(2, level) - 1;
+		//return pow(2, level) - 1;
+		return (1 << level) - 1;
 	}
 
 	static int findClosestBiggerNumberWhichIsPowerOfTwo(int number) {

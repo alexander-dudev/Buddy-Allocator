@@ -1,4 +1,3 @@
-#pragma once
 #include "BuddyAllocator.cpp"
 #include "Utils.cpp"
 #include <cstdlib>
@@ -6,7 +5,7 @@
 using namespace std;
 
 const int ALLOCATED_MEMORY_IN_BYTES = 100;
-const int BLOCK_SIZE_FOR_ALLOCATOR_POWER_OF_TWO = 256;
+const int BLOCK_SIZE_FOR_ALLOCATOR_POWER_OF_TWO = 64;
 const int BLOCK_SIZE_FOR_ALLOCATOR_NOT_POWER_OF_TWO = 55;
 
 void testBitManipulationLogic();
@@ -26,12 +25,12 @@ int main() {
 
 void testAllocatingAndFreeingAllSmallestBlocks() {
 	void* pointerToSomeMemory = malloc(ALLOCATED_MEMORY_IN_BYTES);
-	BuddyAllocator allocator((void*)((uint8_t*)pointerToSomeMemory+2), BLOCK_SIZE_FOR_ALLOCATOR_POWER_OF_TWO);
+	BuddyAllocator allocator(pointerToSomeMemory, BLOCK_SIZE_FOR_ALLOCATOR_POWER_OF_TWO);
 
 	allocator.printAllocatorStateUsingBitSet();
 	cout << endl;
 
-	void* allocated = allocator.allocate(16);
+	void* allocated1 = allocator.allocate(16);
 	allocator.printAllocatorStateUsingBitSet();
 	cout << endl;
 
@@ -41,17 +40,17 @@ void testAllocatingAndFreeingAllSmallestBlocks() {
 	allocator.printAllocatorStateUsingBitSet();
 	cout << endl;
 
-	int* randomInt = (int*)allocated2;
+	int* randomInt = (int*)allocated1;
 	*randomInt = 8;
 	cout << *randomInt << endl;
-	cout << (uintptr_t)allocated2 % alignof(max_align_t) << endl;
+	cout << (uintptr_t)allocated1 % alignof(max_align_t) << endl;
 
-	double* randomDouble = (double*)allocated3;
+	double* randomDouble = (double*)allocated2;
 	*randomDouble = 8.5;
 	cout << *randomDouble << endl;
-	cout << (uintptr_t)allocated3 % alignof(max_align_t) << endl;
+	cout << (uintptr_t)allocated2 % alignof(max_align_t) << endl;
 
-	allocator.free(allocated);
+	allocator.free(allocated1);
 	allocator.free(allocated2);
 	allocator.free(allocated3);
 	allocator.free(allocated4);
@@ -79,7 +78,7 @@ void testBitManipulationLogic() {
 	void* someMemory = malloc(ALLOCATED_MEMORY_IN_BYTES);
 	BuddyAllocator allocator(someMemory, MEMORY_FOR_ALLOCATOR);
 
-	int levels = Utils::calculteNumberOfLevelsFor(MEMORY_FOR_ALLOCATOR);
+	int levels = Utils::calculateNumberOfLevelsFor(MEMORY_FOR_ALLOCATOR);
 	int numberOfPossibleBlocks = Utils::calculateNumberOfPossibleBlocks(levels);
 
 	cout << "All blocks should be free and not split\n";

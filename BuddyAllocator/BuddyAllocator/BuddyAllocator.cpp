@@ -1,16 +1,12 @@
-#pragma once
 #include "Utils.cpp"
 #include <iostream>
 using namespace std;
 
 class BuddyAllocator {
 
-	// TODO:
-	// 1) move all variables inside the block, incl. the forbidden blocks
-
 private:
 	void* pointerToBlockBeginning;
-	void* pointerToAlignedMemory;
+	void* pointerForInnerDataInitialization;
 	int blockSizeInBytes;
 
 	uint8_t* freeTable;
@@ -28,73 +24,79 @@ public:
 
 	BuddyAllocator(void* pointerToBlockBeginning, int blockSizeInBytesFromUser) {
 		this->pointerToBlockBeginning = pointerToBlockBeginning;
-		this->pointerToAlignedMemory = pointerToBlockBeginning;
+		this->pointerForInnerDataInitialization = pointerToBlockBeginning;
 		this->blockSizeInBytes = blockSizeInBytesFromUser;
 
+		int missingBytes = handleTheCaseInWhichBlockSizeIsNotPowerOfTwo(blockSizeInBytesFromUser);
+		
+		int bytesForInitialAlignment = alignBlockBeginningIfNecessary();
+
+		int bytesForFreeAndSplitTables = initializeInnerData();
+
+		int bytesForAllocatorInitialization = missingBytes + bytesForInitialAlignment + bytesForFreeAndSplitTables;
+		int numberOfBlocksToStoreInnerDataSoFar = Utils::calculateNumberOfRequiredBlocksWithTheMinimumSizeToStore(bytesForAllocatorInitialization);
+
+		int allBytesForInitialization = calculateBytesForInitializationAfterAddingInaccessibleBlocksData(bytesForAllocatorInitialization, numberOfBlocksToStoreInnerDataSoFar);
+
+		initializeInaccessibleBlocksData(allBytesForInitialization);
+	}
+
+	int handleTheCaseInWhichBlockSizeIsNotPowerOfTwo(int blockSizeInBytesFromUser) {
+		int missingBytes = 0;
 		if (!Utils::numberIsPowerOfTwo(blockSizeInBytesFromUser)) {
 			int closestBiggerBlockSizeWhichIsPowerOfTwo = Utils::findClosestBiggerNumberWhichIsPowerOfTwo(blockSizeInBytesFromUser);
 			this->blockSizeInBytes = closestBiggerBlockSizeWhichIsPowerOfTwo;
+			missingBytes = closestBiggerBlockSizeWhichIsPowerOfTwo - blockSizeInBytesFromUser;
+			this->pointerToBlockBeginning = (uint8_t*)pointerToBlockBeginning - missingBytes;
 		}
 
-		int missingBytes = this->blockSizeInBytes - blockSizeInBytesFromUser;
-		this->pointerToBlockBeginning = (uint8_t*)pointerToBlockBeginning - missingBytes;
+		return missingBytes;
+	}
 
-		int bytesInitialAlignement = 0;
+	int alignBlockBeginningIfNecessary() {
+		int bytesForInitialAlignment = 0;
 		if ((uintptr_t)this->pointerToBlockBeginning % alignof(max_align_t) != 0) {
-			bytesInitialAlignement = ((uintptr_t)this->pointerToBlockBeginning % alignof(max_align_t));
-			this->pointerToBlockBeginning = (uint8_t*)this->pointerToBlockBeginning - bytesInitialAlignement;
+			bytesForInitialAlignment = ((uintptr_t)this->pointerToBlockBeginning % alignof(max_align_t));
+			this->pointerToBlockBeginning = (uint8_t*)this->pointerToBlockBeginning - bytesForInitialAlignment;
 		}
 
-		// free and split tables initialization
-		int numberOfBytesUsedByTables = initializeFreeAndSplitTables();
-		// at least 2 more integers are required to store the informatio about inaccessible to users blocks
-		// and after that the block has to be aligned for the users
-		numberOfBytesUsedByTables += bytesInitialAlignement;
-		int numberOfBlocksToStoreInnerDataSoFar = Utils::calculateNumberOfRequiredBlocksWithTheMinimumSizeToStore(numberOfBytesUsedByTables + missingBytes);
+		return bytesForInitialAlignment;
+	}
 
-		// align to store ints !!!
-		void* temporaryPointer = this->pointerToAlignedMemory;
-		int bytesAfterAddingInaccessibleBlocksData = numberOfBytesUsedByTables;
-		bytesAfterAddingInaccessibleBlocksData += missingBytes;
-		if ((uintptr_t)temporaryPointer % alignof(int) != 0) {
-			int bytesForAlignment = alignof(int)-((uintptr_t)temporaryPointer % alignof(int));
-			temporaryPointer = (uint8_t*)temporaryPointer + bytesForAlignment;
-			bytesAfterAddingInaccessibleBlocksData += bytesForAlignment;
-		}
-
-		void* temp2 = temporaryPointer;
-
-		bytesAfterAddingInaccessibleBlocksData += sizeof(int) + sizeof(int) * numberOfBlocksToStoreInnerDataSoFar;
-
+	int calculateBytesForInitializationAfterAddingInaccessibleBlocksData(int bytesForAllocatorInitialization, int numberOfBlocksToStoreInnerDataSoFar) {
+		int bytesForInitializationAfterAddingInaccessibleBlocksData = bytesForAllocatorInitialization;
 		
-		temporaryPointer = (uint8_t*)temporaryPointer + sizeof(int) + sizeof(int) * numberOfBlocksToStoreInnerDataSoFar;
+		if ((uintptr_t)this->pointerForInnerDataInitialization % alignof(int) != 0) {
+			int bytesForAlignment = alignof(int)-((uintptr_t)this->pointerForInnerDataInitialization % alignof(int));
+			this->pointerForInnerDataInitialization = (uint8_t*)this->pointerForInnerDataInitialization + bytesForAlignment;
+			bytesForInitializationAfterAddingInaccessibleBlocksData += bytesForAlignment;
+		}
 
-		int numberOfBlocksAfterAddingInaccessibleBlocksInfo = Utils::calculateNumberOfRequiredBlocksWithTheMinimumSizeToStore(bytesAfterAddingInaccessibleBlocksData);
+		bytesForInitializationAfterAddingInaccessibleBlocksData += sizeof(int) + sizeof(int) * numberOfBlocksToStoreInnerDataSoFar;
+		int numberOfBlocksAfterAddingInaccessibleBlocksInfo = Utils::calculateNumberOfRequiredBlocksWithTheMinimumSizeToStore(bytesForInitializationAfterAddingInaccessibleBlocksData);
 
 		while (numberOfBlocksAfterAddingInaccessibleBlocksInfo - numberOfBlocksToStoreInnerDataSoFar > 0) {
-			// remove bytes for alignment
-
-			bytesAfterAddingInaccessibleBlocksData += (numberOfBlocksAfterAddingInaccessibleBlocksInfo - numberOfBlocksToStoreInnerDataSoFar) * sizeof(int);
-
+			bytesForInitializationAfterAddingInaccessibleBlocksData += (numberOfBlocksAfterAddingInaccessibleBlocksInfo - numberOfBlocksToStoreInnerDataSoFar) * sizeof(int);
 			numberOfBlocksToStoreInnerDataSoFar = numberOfBlocksAfterAddingInaccessibleBlocksInfo;
-			numberOfBlocksAfterAddingInaccessibleBlocksInfo = Utils::calculateNumberOfRequiredBlocksWithTheMinimumSizeToStore(bytesAfterAddingInaccessibleBlocksData);
+			numberOfBlocksAfterAddingInaccessibleBlocksInfo = Utils::calculateNumberOfRequiredBlocksWithTheMinimumSizeToStore(bytesForInitializationAfterAddingInaccessibleBlocksData);
 		}
 
+		return bytesForInitializationAfterAddingInaccessibleBlocksData;
+	}
 
-
-
-		this->numberOfInaccessibleToUserBlockIndexes = (int*)temp2;
-		*(this->numberOfInaccessibleToUserBlockIndexes) = Utils::calculateNumberOfRequiredBlocksWithTheMinimumSizeToStore(bytesAfterAddingInaccessibleBlocksData);
+	void initializeInaccessibleBlocksData(int allBytesForInitialization) {
+		this->numberOfInaccessibleToUserBlockIndexes = (int*)this->pointerForInnerDataInitialization;
+		*(this->numberOfInaccessibleToUserBlockIndexes) = Utils::calculateNumberOfRequiredBlocksWithTheMinimumSizeToStore(allBytesForInitialization);
 		inaccessibleToUserBlockIndexes = this->numberOfInaccessibleToUserBlockIndexes + sizeof(int);
+
 		for (int i = 0; i < *(this->numberOfInaccessibleToUserBlockIndexes); ++i) {
 			void* allocatedBlock = allocate(Utils::MIN_ALLOCATED_BLOCK_SIZE_IN_BYTES);
 			int blockIndex = findBlockIndexFrom(allocatedBlock);
 			inaccessibleToUserBlockIndexes[i] = blockIndex;
 		}
-		
 	}
 
-	int initializeFreeAndSplitTables() {
+	int initializeInnerData() {
 
 		// in the provided by the user memory the data the allocator needs is ordered as follows:
 		// bytes for alignment (for next int) | numberOfPossibleBlocks (int) | requiredBytesForFreeTable (int)
@@ -104,7 +106,7 @@ public:
 		// numberOfInaccessibleToUserBlockIndexes (int) | inaccessibleToUserBlockIndexes (int[])
 		// bytes for alignment (for blocks which will be returned to the user)
 
-		int levels = Utils::calculteNumberOfLevelsFor(this->blockSizeInBytes);
+		int levels = Utils::calculateNumberOfLevelsFor(this->blockSizeInBytes);
 		int numberOfPossibleBlocks = Utils::calculateNumberOfPossibleBlocks(levels);
 		int numberOfPossibleBlocksWithoutLastLevel = Utils::calculateNumberOfPossibleBlocks(levels - 1);
 
@@ -113,45 +115,45 @@ public:
 
 		int totalBytesUsedForTables = 0;
 
-		if ((uintptr_t)pointerToAlignedMemory % alignof(int) != 0) {
-			totalBytesUsedForTables += alignof(int)-((uintptr_t)pointerToAlignedMemory % alignof(int));
-			pointerToAlignedMemory = (uint8_t*)pointerToAlignedMemory + totalBytesUsedForTables;
+		if ((uintptr_t)pointerForInnerDataInitialization % alignof(int) != 0) {
+			totalBytesUsedForTables += alignof(int)-((uintptr_t)pointerForInnerDataInitialization % alignof(int));
+			pointerForInnerDataInitialization = (uint8_t*)pointerForInnerDataInitialization + totalBytesUsedForTables;
 		}
 
 		// pointerToAlignedMemory is pointing to an aligned address for an int variable
 
 		// number of possible blocks
-		this->numberOfPossibleBlocks = (int*)pointerToAlignedMemory;
+		this->numberOfPossibleBlocks = (int*)pointerForInnerDataInitialization;
 		*(this->numberOfPossibleBlocks) = numberOfPossibleBlocks;
-		pointerToAlignedMemory = (uint8_t*)pointerToAlignedMemory + sizeof(int);
+		pointerForInnerDataInitialization = (uint8_t*)pointerForInnerDataInitialization + sizeof(int);
 		totalBytesUsedForTables += sizeof(int);
 
 		// free table size
-		this->requiredBytesForFreeTable = (int*)pointerToAlignedMemory;
+		this->requiredBytesForFreeTable = (int*)pointerForInnerDataInitialization;
 		*(this->requiredBytesForFreeTable) = requiredBytesForFreeTable;
-		pointerToAlignedMemory = (uint8_t*)pointerToAlignedMemory + sizeof(int);
+		pointerForInnerDataInitialization = (uint8_t*)pointerForInnerDataInitialization + sizeof(int);
 		totalBytesUsedForTables += sizeof(int);
 
 		// number of possible blocks without last level
-		this->numberOfPossibleBlocksWithoutLastLevel = (int*)pointerToAlignedMemory;
+		this->numberOfPossibleBlocksWithoutLastLevel = (int*)pointerForInnerDataInitialization;
 		*(this->numberOfPossibleBlocksWithoutLastLevel) = numberOfPossibleBlocksWithoutLastLevel;
-		pointerToAlignedMemory = (uint8_t*)pointerToAlignedMemory + sizeof(int);
+		pointerForInnerDataInitialization = (uint8_t*)pointerForInnerDataInitialization + sizeof(int);
 		totalBytesUsedForTables += sizeof(int);
 
 		// split table size
-		this->requiredBytesForSplitTable = (int*)(pointerToAlignedMemory);
+		this->requiredBytesForSplitTable = (int*)(pointerForInnerDataInitialization);
 		*(this->requiredBytesForSplitTable) = requiredBytesForSplitTable;
-		pointerToAlignedMemory = (uint8_t*)pointerToAlignedMemory + sizeof(int);
+		pointerForInnerDataInitialization = (uint8_t*)pointerForInnerDataInitialization + sizeof(int);
 		totalBytesUsedForTables += sizeof(int);
 
 		// free table
-		freeTable = (uint8_t*)pointerToAlignedMemory;
-		pointerToAlignedMemory = (uint8_t*)pointerToAlignedMemory + *(this->requiredBytesForFreeTable);
+		freeTable = (uint8_t*)pointerForInnerDataInitialization;
+		pointerForInnerDataInitialization = (uint8_t*)pointerForInnerDataInitialization + *(this->requiredBytesForFreeTable);
 		totalBytesUsedForTables += *(this->requiredBytesForFreeTable);
 
 		// split table
-		splitTable = (uint8_t*)pointerToAlignedMemory;
-		pointerToAlignedMemory = (uint8_t*)pointerToAlignedMemory + *(this->requiredBytesForSplitTable);
+		splitTable = (uint8_t*)pointerForInnerDataInitialization;
+		pointerForInnerDataInitialization = (uint8_t*)pointerForInnerDataInitialization + *(this->requiredBytesForSplitTable);
 		totalBytesUsedForTables += *(this->requiredBytesForSplitTable);
 
 		for (int i = 0; i < requiredBytesForFreeTable; ++i) {
@@ -163,17 +165,6 @@ public:
 		}
 
 		return totalBytesUsedForTables;
-	}
-
-	int alignBlockIfNecessary(void*& pointerToBlock) {
-		int numberOfSkippedBytesForAlignment = 0;
-
-		if ((uintptr_t)pointerToBlock % Utils::MIN_ALLOCATED_BLOCK_SIZE_IN_BYTES != 0) {
-			numberOfSkippedBytesForAlignment = Utils::MIN_ALLOCATED_BLOCK_SIZE_IN_BYTES -((uintptr_t)pointerToBlock % Utils::MIN_ALLOCATED_BLOCK_SIZE_IN_BYTES);
-			pointerToBlock = (uint8_t*)pointerToBlock + numberOfSkippedBytesForAlignment;
-		}
-
-		return numberOfSkippedBytesForAlignment;
 	}
 
 	int calculateNumberOfBytesNeededForAlignment(void* pointerToBlock) {
@@ -300,7 +291,7 @@ private:
 
 public:
 	void printAllocatorStateUsingBitSet() {
-		int levels = Utils::calculteNumberOfLevelsFor(blockSizeInBytes);
+		int levels = Utils::calculateNumberOfLevelsFor(blockSizeInBytes);
 		int numberOfPossibleBlocks = Utils::calculateNumberOfPossibleBlocks(levels);
 		for (int i = 0; i < numberOfPossibleBlocks; i++) {
 			cout << "Block with index " << i << " is: " << (isFree(i) ? "free" : "busy") << " and "
