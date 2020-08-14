@@ -1,43 +1,67 @@
 #include "BuddyAllocator.cpp"
 #include "Utils.cpp"
 #include <cstdlib>
-#include<iostream>
+#include <iostream>
 using namespace std;
 
-const int ALLOCATED_MEMORY_IN_BYTES = 100;
-const int BLOCK_SIZE_FOR_ALLOCATOR_POWER_OF_TWO = 64;
-const int BLOCK_SIZE_FOR_ALLOCATOR_NOT_POWER_OF_TWO = 55;
+const int ALLOCATED_MEMORY = 100;
+const int BLOCK_SIZE_POWER_OF_TWO = 64;
+const int BLOCK_SIZE_NOT_POWER_OF_TWO = 90;
+
+void testAlignedBlock();
+void testNotAlignedBlock();
+
+void testAllocator(void*, int);
+void testAllocator2(void*, int);
 
 void testBitManipulationLogic();
-void testAllocatingAndFreeingAllSmallestBlocks();
-void testProvidingBlockSizeWhichIsNotPowerOfTwo();
+void printAlignOfValues();
 
 int main() {
-	testAllocatingAndFreeingAllSmallestBlocks();
-	//testBitManipulationLogic();
-	//testProvidingBlockSizeWhichIsNotPowerOfTwo();
+	testAlignedBlock();
 
-	cout << alignof(int) << endl;
-	cout << alignof(max_align_t) << endl;
+	//testNotAlignedBlock();
+
+	//testBitManipulationLogic();
+	
+	//printAlignOfValues();
 
 	return 0;
 }
 
-void testAllocatingAndFreeingAllSmallestBlocks() {
-	void* pointerToSomeMemory = malloc(ALLOCATED_MEMORY_IN_BYTES);
-	BuddyAllocator allocator(pointerToSomeMemory, BLOCK_SIZE_FOR_ALLOCATOR_POWER_OF_TWO);
+void testAlignedBlock() {
+	void* pointerToSomeMemory = malloc(ALLOCATED_MEMORY);
 
-	allocator.printAllocatorStateUsingBitSet();
+	testAllocator(pointerToSomeMemory, BLOCK_SIZE_POWER_OF_TWO);
+	//testAllocator(pointerToSomeMemory, BLOCK_SIZE_NOT_POWER_OF_TWO);
+
+	free(pointerToSomeMemory);
+}
+
+void testNotAlignedBlock() {
+	void* pointerToSomeMemory = malloc(ALLOCATED_MEMORY);
+
+	//testAllocator((void*)((uint8_t*)pointerToSomeMemory + 2), 2 * BLOCK_SIZE_POWER_OF_TWO);
+	//testAllocator((void*)((uint8_t*)pointerToSomeMemory + 2), BLOCK_SIZE_NOT_POWER_OF_TWO);
+
+	free(pointerToSomeMemory);
+}
+
+
+void testAllocator(void* pointerToMemory, int sizeInBytes) {
+	BuddyAllocator allocator(pointerToMemory, sizeInBytes);
+
+	allocator.printAllocatorState();
 	cout << endl;
 
 	void* allocated1 = allocator.allocate(16);
-	allocator.printAllocatorStateUsingBitSet();
+	allocator.printAllocatorState();
 	cout << endl;
 
 	void* allocated2 = allocator.allocate(16);
 	void* allocated3 = allocator.allocate(16);
 	void* allocated4 = allocator.allocate(16);
-	allocator.printAllocatorStateUsingBitSet();
+	allocator.printAllocatorState();
 	cout << endl;
 
 	int* randomInt = (int*)allocated1;
@@ -55,51 +79,50 @@ void testAllocatingAndFreeingAllSmallestBlocks() {
 	allocator.free(allocated3);
 	allocator.free(allocated4);
 
-	allocator.printAllocatorStateUsingBitSet();
+	allocator.printAllocatorState();
 	cout << endl;
-
-	free(pointerToSomeMemory);
 }
 
-void testProvidingBlockSizeWhichIsNotPowerOfTwo() {
-	void* pointerToSomeMemory = malloc(ALLOCATED_MEMORY_IN_BYTES);
-	BuddyAllocator allocator(pointerToSomeMemory, BLOCK_SIZE_FOR_ALLOCATOR_NOT_POWER_OF_TWO);
-	allocator.printAllocatorStateUsingBitSet();
+void testAllocator2(void* pointerToMemory, int sizeInBytes) {
+	BuddyAllocator allocator(pointerToMemory, sizeInBytes);
+	allocator.printAllocatorState();
 	cout << endl;
-	
-	allocator.free((char*) pointerToSomeMemory - 9);
-	allocator.free((char*)pointerToSomeMemory + 7);
+
+	void* allocated1 = allocator.allocate(16);
+	void* allocated2 = allocator.allocate(32);
+	allocator.printAllocatorState();
+	cout << endl;
+
+	allocator.free(allocated1);
+	allocator.free(allocated2);
+	allocator.printAllocatorState();
+	cout << endl;
 }
 
 void testBitManipulationLogic() {
-	const int ALLOCATED_MEMORY_IN_BYTES = 100;
-	const int MEMORY_FOR_ALLOCATOR = 64;
+	void* someMemory = malloc(BLOCK_SIZE_POWER_OF_TWO);
 
-	void* someMemory = malloc(ALLOCATED_MEMORY_IN_BYTES);
-	BuddyAllocator allocator(someMemory, MEMORY_FOR_ALLOCATOR);
-
-	int levels = Utils::calculateNumberOfLevelsFor(MEMORY_FOR_ALLOCATOR);
-	int numberOfPossibleBlocks = Utils::calculateNumberOfPossibleBlocks(levels);
-
-	cout << "All blocks should be free and not split\n";
-	allocator.printAllocatorStateUsingBitSet();
+	BuddyAllocator allocator(someMemory, BLOCK_SIZE_POWER_OF_TWO);
+	allocator.printAllocatorState();
 	cout << endl;
 
-	allocator.markBlockAsSplit(0);
-	allocator.markBlockAsSplit(1);
-	allocator.markBlockAsBusy(4);
+	allocator.markBlockAsSplit(2);
 	allocator.markBlockAsBusy(5);
 
-	allocator.printAllocatorStateUsingBitSet();
+	allocator.printAllocatorState();
 	cout << endl;
 
-	allocator.markBlockAsNotSplit(0);
-	allocator.markBlockAsNotSplit(1);
-	allocator.markBlockAsFree(4);
+	allocator.markBlockAsNotSplit(2);
 	allocator.markBlockAsFree(5);
 
-	allocator.printAllocatorStateUsingBitSet();
+	allocator.printAllocatorState();
 	cout << endl;
 
 	free(someMemory);
+}
+
+void printAlignOfValues() {
+	cout << alignof(int) << endl;
+	cout << alignof(double) << endl;
+	cout << alignof(max_align_t) << endl;
 }

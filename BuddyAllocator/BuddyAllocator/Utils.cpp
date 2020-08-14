@@ -12,6 +12,10 @@ public:
 	static const uint8_t LARGEST_8_BIT_NUMBER = (uint8_t)255;
 	static const uint8_t SMALLEST_8_BIT_NUMBER = (uint8_t)0;
 
+	static int createMaskFor(int bitIndexInsideSingleByte) {
+		return Utils::MASK_FOR_BIT_WITH_INDEX_ZERO << bitIndexInsideSingleByte;
+	}
+
 	// pow(2,i) == 1 << i
 	static int calculateNumberOfBlocksPer(int level) {
 		//return pow(2, level);
@@ -118,5 +122,13 @@ public:
 			return (sizeInBytes / Utils::MIN_ALLOCATED_BLOCK_SIZE_IN_BYTES) + 1;
 		}
 
+	}
+
+	static int findByteIndexFor(int blockIndex) {
+		return blockIndex / Utils::NUMBER_OF_BITS_IN_A_BYTE;
+	}
+
+	static int findBitIndexInsideSingleByteFor(int blockIndex) {
+		return blockIndex % Utils::NUMBER_OF_BITS_IN_A_BYTE;
 	}
 };

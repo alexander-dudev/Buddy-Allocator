@@ -22,6 +22,10 @@ private:
 
 public:
 
+	// 2 methods find -> utils
+	// createMask -> utils
+	// ROOT_INDEX = 0 -> Utils
+
 	BuddyAllocator(void* pointerToBlockBeginning, int blockSizeInBytesFromUser) {
 		this->pointerToBlockBeginning = pointerToBlockBeginning;
 		this->pointerForInnerDataInitialization = pointerToBlockBeginning;
@@ -166,8 +170,8 @@ private:
 		return bytesForInitialAlignment;
 	}
 
-	int calculateBytesForInitializationAfterAddingInaccessibleBlocksData(int bytesForAllocatorInitialization, int numberOfBlocksToStoreInnerDataSoFar) {
-		int bytesForInitializationAfterAddingInaccessibleBlocksData = bytesForAllocatorInitialization;
+	int calculateBytesForInitializationAfterAddingInaccessibleBlocksData(int bytesForInitialization, int numberOfBlocksToStoreInnerDataSoFar) {
+		int bytesForInitializationAfterAddingInaccessibleBlocksData = bytesForInitialization;
 
 		if ((uintptr_t)this->pointerForInnerDataInitialization % alignof(int) != 0) {
 			int bytesForAlignment = alignof(int)-((uintptr_t)this->pointerForInnerDataInitialization % alignof(int));
@@ -271,31 +275,17 @@ private:
 		pointerToMemory = (uint8_t*)pointerToMemory + bytesForTable;
 	}
 
-	int findByteIndexFor(int blockIndex) {
-		return blockIndex / Utils::NUMBER_OF_BITS_IN_A_BYTE;
-	}
-
-	int findBitIndexInsideSingleByteFor(int blockIndex) {
-		return blockIndex % Utils::NUMBER_OF_BITS_IN_A_BYTE;
-	}
-
 	bool isFree(int blockIndex) {
 		if (blockIndex >= *numberOfPossibleBlocks) {
 			cerr << "Warning! An invalid block index is used to check whether a block is free or busy!" << endl;
 			return false;
 		}
 
-		int byteIndex = findByteIndexFor(blockIndex);
-		int bitIndexInsideSingleByte = findBitIndexInsideSingleByteFor(blockIndex);
-		uint8_t mask = createMaskFor(bitIndexInsideSingleByte);
+		int byteIndex = Utils::findByteIndexFor(blockIndex);
+		int bitIndexInsideSingleByte = Utils::findBitIndexInsideSingleByteFor(blockIndex);
+		uint8_t mask = Utils::createMaskFor(bitIndexInsideSingleByte);
 
 		return freeTable[byteIndex] & mask;
-	}
-
-
-
-	int createMaskFor(int bitIndexInsideSingleByte) {
-		return Utils::MASK_FOR_BIT_WITH_INDEX_ZERO << bitIndexInsideSingleByte;
 	}
 
 	bool isSplit(int blockIndex) {
@@ -309,9 +299,9 @@ private:
 		}
 
 		// 0 <= blockIndex < numberOfPossibleBlocksWithoutLastLevel
-		int byteIndex = findByteIndexFor(blockIndex);
-		int bitIndexInsideSingleByte = findBitIndexInsideSingleByteFor(blockIndex);
-		uint8_t mask = createMaskFor(bitIndexInsideSingleByte);
+		int byteIndex = Utils::findByteIndexFor(blockIndex);
+		int bitIndexInsideSingleByte = Utils::findBitIndexInsideSingleByteFor(blockIndex);
+		uint8_t mask = Utils::createMaskFor(bitIndexInsideSingleByte);
 
 		return splitTable[byteIndex] & mask;
 	}
@@ -324,9 +314,9 @@ public:
 			return;
 		}
 
-		int byteIndex = findByteIndexFor(blockIndex);
-		int bitIndexInsideSingleByte = findBitIndexInsideSingleByteFor(blockIndex);
-		uint8_t mask = createMaskFor(bitIndexInsideSingleByte);
+		int byteIndex = Utils::findByteIndexFor(blockIndex);
+		int bitIndexInsideSingleByte = Utils::findBitIndexInsideSingleByteFor(blockIndex);
+		uint8_t mask = Utils::createMaskFor(bitIndexInsideSingleByte);
 
 		freeTable[byteIndex] |= mask;
 	}
@@ -337,9 +327,9 @@ public:
 			return;
 		}
 
-		int byteIndex = findByteIndexFor(blockIndex);
-		int bitIndexInsideSingleByte = findBitIndexInsideSingleByteFor(blockIndex);
-		uint8_t mask = createMaskFor(bitIndexInsideSingleByte);
+		int byteIndex = Utils::findByteIndexFor(blockIndex);
+		int bitIndexInsideSingleByte = Utils::findBitIndexInsideSingleByteFor(blockIndex);
+		uint8_t mask = Utils::createMaskFor(bitIndexInsideSingleByte);
 
 		freeTable[byteIndex] &= ~mask;
 	}
@@ -355,9 +345,9 @@ public:
 			return;
 		}
 
-		int byteIndex = findByteIndexFor(blockIndex);
-		int bitIndexInsideSingleByte = findBitIndexInsideSingleByteFor(blockIndex);
-		uint8_t mask = createMaskFor(bitIndexInsideSingleByte);
+		int byteIndex = Utils::findByteIndexFor(blockIndex);
+		int bitIndexInsideSingleByte = Utils::findBitIndexInsideSingleByteFor(blockIndex);
+		uint8_t mask = Utils::createMaskFor(bitIndexInsideSingleByte);
 
 		splitTable[byteIndex] |= mask;
 	}
@@ -373,19 +363,22 @@ public:
 			return;
 		}
 
-		int byteIndex = findByteIndexFor(blockIndex);
-		int bitIndexInsideSingleByte = findBitIndexInsideSingleByteFor(blockIndex);
-		uint8_t mask = createMaskFor(bitIndexInsideSingleByte);
+		int byteIndex = Utils::findByteIndexFor(blockIndex);
+		int bitIndexInsideSingleByte = Utils::findBitIndexInsideSingleByteFor(blockIndex);
+		uint8_t mask = Utils::createMaskFor(bitIndexInsideSingleByte);
 
 		splitTable[byteIndex] &= ~mask;
 	}
 
-	void printAllocatorStateUsingBitSet() {
-		int levels = Utils::calculateNumberOfLevelsFor(blockSizeInBytes);
-		int numberOfPossibleBlocks = Utils::calculateNumberOfPossibleBlocks(levels);
-		for (int i = 0; i < numberOfPossibleBlocks; i++) {
-			cout << "Block with index " << i << " is: " << (isFree(i) ? "free" : "busy") << " and "
-				<< (isSplit(i) ? "split" : "not split") << endl;
+	void printAllocatorState() {
+		for (int i = 0; i < *numberOfPossibleBlocks; ++i) {
+			cout << "Block with index " << i << " is: ";
+			if (isSplit(i)) {
+				cout << "split" << endl;
+			}
+			else {
+				cout << "not split and " << (isFree(i) ? "free" : "busy") << endl;
+			}
 		}
 	}
 };
